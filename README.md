@@ -11,9 +11,12 @@
 - `release/windows-x64/SAMURAI-S751-v0.0.9-factory.exe`：工厂连续烧录包。成功后保持窗口打开，等待拔下本把并连接下一把，显示成功/失败计数，支持暂停。
 - `examples/SAMURAI-S751-v0.0.9.qmk`：通用固件数据包，含固件段、参数及 SHA-256。
 - `release/windows-x64.qmk-runtime.zip`：本次 Windows 构建导出的可导入运行模板。
+- `release/QMK-All-System-Templates.zip`：已完成原生构建、启动检查的四系统运行模板集合。
+- `release/macos-arm64/SAMURAI-S751-v0.0.9.zip`、`release/macos-x64/SAMURAI-S751-v0.0.9.zip`：在 Windows 装包的真实 Mac 示例升级包。
+- `release/linux-x64/SAMURAI-S751-v0.0.9.tar.gz`：在 Windows 装包的 Linux 示例升级包。
 - `maker-preview.png`、`updater-preview.png`、`factory-preview.png`：实际 Qt 界面截图。
 
-**验证范围：** 当前在 Windows 主机完成自动化测试、Qt 界面渲染及打包程序启动检查。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7、macOS 或 Linux 真机运行。跨平台源码和构建工作流已提供；macOS/Linux 原生二进制须在各自系统构建后测试，不能把 Windows EXE 当成其他系统的软件发布。
+**验证范围：** 四系统运行模板已在各自原生 GitHub runner 构建，通过自动化测试、冻结程序启动和安全预览检查；Mac 解压后的应用另通过 `codesign --verify --deep --strict`。Windows 工具已装入四平台模板，可直接选择目标系统。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7 真机运行。Mac 正式对外分发仍需要厂家的 Developer ID 签名和公证。
 
 ## 制作升级包
 
@@ -27,8 +30,8 @@
 
 **可以在 Windows 制作工具中生成 Mac 或 Linux 客户包。** 运行模板首次在对应系统构建一次，之后每次更换固件、设备参数、背景或烧录模式，都可以在 Windows 离线装包。下拉框明确显示 Windows、macOS Apple Silicon、macOS Intel 和 Linux，不再使用「本机原生」字样。
 
-1. 获得对应系统的 `*.qmk-runtime.zip`，或包含全部系统模板的 `QMK-All-System-Templates.zip`。
-2. 点击「导入模板」，导入一个模板或完整模板集合。工具校验模板 API 版本、文件完整性和实际 PE / Mach-O / ELF 架构。
+1. 完整 Windows 工具包已经在旁边 `templates/` 附带四系统真实模板。直接打开目录中的制作工具，选择目标系统即可。
+2. 如果只复制了单独 EXE，点击「导入模板」，选择对应 `*.qmk-runtime.zip` 或 `QMK-All-System-Templates.zip`。工具校验模板 API 版本、文件完整性和实际 PE / Mach-O / ELF 架构。
 3. 选择目标系统，显示「模板已就绪」后即可生成。没有该系统模板时会明确显示待导入，不会生成伪装的文件。
 
 | 客户系统 | 输出 | 客户操作 |
@@ -39,7 +42,7 @@
 
 Mac 包保留模板 `.app` 内所有文件字节和框架符号链接，把固件与设置放在应用旁的隐藏 `.qmk-update` 中。因此 Windows 装包不调用 `codesign`，不修改已签名 `.app` 的资源。客户需保留整个解压文件夹，不能只把 `.app` 单独移走。隐藏固件包仍使用本项目的 SHA-256 完整性校验。
 
-**当前交付仅有真实 Windows 运行模板。** Mac/Linux 模板构建流水线已提供，跨系统装包逻辑使用明确标记的架构测试样本验证，尚未在本机产出或运行真实 Mac/Linux 模板。这些测试样本不会放进交付目录。
+**当前交付已经包含四系统真实运行模板。** 最终构建与成品启动验证见 [GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42559054059)，源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
 
 ## 单次与连续烧录
 
@@ -85,7 +88,7 @@ sudo install -m 644 drivers/70-qmk-wb32.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules
 ```
 
-然后重新插拔键盘。修改 APP VID/PID 后，应相应修改规则。Linux 客户程序的「连接帮助」可导出适配本包实际 APP/Boot 标识的规则。桌面会话通过 `uaccess` 授予当前用户权限；无 systemd/logind 的环境应按发行版配置专用设备组。客户升级程序本身不要求以 root 运行。
+然后重新插拔键盘。修改 APP VID/PID 后，应相应修改规则。规则同时覆盖 APP USB / hidraw 和 Boot USB，兼容两种 HID 后端。Linux 客户程序的「连接帮助」可导出适配本包实际 APP/Boot 标识的规则。桌面会话通过 `uaccess` 授予当前用户权限；无 systemd/logind 的环境应按发行版配置专用设备组。客户升级程序本身不要求以 root 运行。
 
 Windows 单 EXE / Linux 归档内的可执行文件包含固件，不需要客户选择文件或安装 Python。Windows7 兼容性是构建目标，仍需在准备发布的 Win7 SP1 镜像上实测，包括 USB 权限、WinUSB 和运行库。
 
@@ -132,10 +135,10 @@ python tools/build.py --clean
 Ubuntu 22.04 构建前安装系统组件：
 
 ```sh
-sudo apt-get install libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libhidapi-hidraw0 libusb-1.0-0
+sudo apt-get install libegl1 libopengl0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxkbcommon-x11-0 libhidapi-hidraw0 libusb-1.0-0
 ```
 
-`.github/workflows/build.yml` 包含 Windows x64、macOS Intel/ARM64、Linux x64 四个原生构建任务。每个任务导出运行模板并制作示例客户包；最后汇总成 `QMK-All-System-Templates.zip`，供 Windows 工具一次性导入。下载 GitHub artifact 后，如外面还有一层 ZIP，先解压取得这个模板集合文件。本项目没有代为上传、运行远程工作流或发布。
+`.github/workflows/build.yml` 包含 Windows x64、macOS Intel/ARM64、Linux x64 四个原生构建任务。每个任务导出运行模板并制作示例客户包，再验证冻结程序启动；最后汇总成 `QMK-All-System-Templates.zip`，供 Windows 工具一次性导入。下载 GitHub artifact 后，如外面还有一层 ZIP，先解压取得这个模板集合文件。推送构建分支会自动重新构建，工作流合入默认分支后也可手动触发。
 
 每次 `tools/build.py` 构建都会在 `release/` 导出对应 `.qmk-runtime.zip`。模板需为 **1.3.0 / Runtime API 3**，以支持跨系统装包、背景和外部 Mac 固件包。导入后的目录位于制作工具旁：
 
