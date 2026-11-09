@@ -24,7 +24,7 @@
 - `release/linux-x64/mk20b_via_v9_update.tar.gz`：在 Windows 装包的 Linux 示例升级包。
 - `maker-preview.png`、`updater-preview.png`、`factory-preview.png`：实际 Qt 界面截图。
 
-**验证范围：** 上一版 1.5.0 / API 5 的四系统运行模板已在各自原生 GitHub runner 构建，通过自动化测试、冻结程序启动和安全预览检查；Mac 解压后的应用另通过 `codesign --verify --deep --strict`。本轮 1.6.0 / API 6 的最终构建验证单独记录在 [VALIDATION.md](VALIDATION.md)。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7 真机运行。Mac 正式对外分发仍需要厂家的 Developer ID 签名和公证。
+**验证范围：** 本轮 1.6.0 / API 6 的四系统运行模板已在各自原生 GitHub runner 构建，通过 157 项自动化测试、冻结程序启动和安全预览检查；Mac 解压后的应用另通过 `codesign --verify --deep --strict`。详见 [最终 GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42583485189) 和 [VALIDATION.md](VALIDATION.md)。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7 真机运行。Mac 正式对外分发仍需要厂家的 Developer ID 签名和公证。
 
 ## 制作升级包
 
@@ -50,7 +50,7 @@
 
 Mac 包保留模板 `.app` 内所有文件字节和框架符号链接，把固件与设置放在应用旁的隐藏 `.qmk-update` 中。因此 Windows 装包不调用 `codesign`，不修改已签名 `.app` 的资源。客户需保留整个解压文件夹，不能只把 `.app` 单独移走。隐藏固件包仍使用本项目的 SHA-256 完整性校验。
 
-**制作工具标题保持 v1.0.0，本轮运行模板需要 1.6.0 / API 6。** 使用新模板重新生成客户包，已有客户 EXE 不会自动获得本轮 USB 连接处理改进。此前 APP/手动 DFU 双路径的原生构建与成品启动验证见 [1.5.0 版 GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42576005364)，该记录对应 API 5；本轮结果见 [VALIDATION.md](VALIDATION.md)。源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
+**制作工具标题保持 v1.0.0，本轮运行模板需要 1.6.0 / API 6。** 使用新模板重新生成客户包，已有客户 EXE 不会自动获得本轮 USB 连接处理改进。本轮原生构建与成品启动验证见 [最终 GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42583485189)，源提交 `2a310ac`；详细结果见 [VALIDATION.md](VALIDATION.md)。源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
 
 ## 单次与连续烧录
 
