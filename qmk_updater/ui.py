@@ -393,7 +393,15 @@ class MakerWindow(QMainWindow):
     def set_accent(self, color):
         from .layouts import apply_compact_theme
         self.accent = color
-        apply_compact_theme(self, color)
+        apply_compact_theme(self, color, background=self.maker_background)
+
+    def set_maker_theme(self, key):
+        from .maker_theme import THEMES
+        from .layouts import apply_compact_theme
+        theme = next((item for item in THEMES if item[0] == key), next(item for item in THEMES if item[0] == "blue"))
+        self.maker_theme, self.maker_background = theme[0], theme[3]
+        self.theme_buttons[self.maker_theme].setChecked(True)
+        apply_compact_theme(self, self.accent, background=self.maker_background)
 
     def refresh_preview(self, *args):
         if not hasattr(self, "mode_hint"):
@@ -404,7 +412,8 @@ class MakerWindow(QMainWindow):
                                               self.firmware.size if self.firmware else 0,
                                               self.background_combo.currentData(), self.accent,
                                               self.auto_start.isChecked(), continuous,
-                                              filename=package_filename(self.output_name.text(), TARGETS[self.platform_combo.currentData()][1]),
+                                              filename=package_filename(self.output_name.text(), TARGETS[self.platform_combo.currentData()][1],
+                                                                        firmware_stem(self.firmware_path) if self.firmware_path else "firmware"),
                                               target_label=self.platform_combo.currentText(),
                                               firmware_name=self.firmware.name if self.firmware else "等待选择固件",
                                               app_ids=self.inputs["app_vid"].text() + " : " + self.inputs["app_pid"].text(),
@@ -539,7 +548,8 @@ class MakerWindow(QMainWindow):
             if path:
                 content = {"settings": asdict(settings), "firmware": str(self.firmware_path or ""),
                            "bin_base": self.base.text(), "usb_index": self.usb_combo.currentIndex(),
-                           "hid_index": self.hid_combo.currentIndex(), "output_name": self.output_name.text()}
+                           "hid_index": self.hid_combo.currentIndex(), "output_name": self.output_name.text(),
+                           "maker_theme": self.maker_theme}
                 Path(path).write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
                 self.status.setText("配置已保存")
         except Exception as e:
@@ -576,6 +586,7 @@ class MakerWindow(QMainWindow):
             if content.get("output_name"):
                 self.output_name.setText(content["output_name"])
             self.set_accent(settings.accent)
+            self.set_maker_theme(content.get("maker_theme", "blue"))
             self.status.setText("配置已载入 · 请确认固件和设备参数")
         except Exception as e:
             QMessageBox.warning(self, "配置无法载入", str(e))

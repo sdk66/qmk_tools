@@ -5,12 +5,12 @@ from qmk_updater.filenames import firmware_stem, package_filename
 
 
 class FilenameTests(unittest.TestCase):
-    def test_firmware_default_preserves_source_basename(self):
+    def test_firmware_default_preserves_source_basename_and_adds_update(self):
         cases = (
-            ("mk20b_via_v9.hex", "mk20b_via_v9"),
-            (PureWindowsPath(r"C:\Firmware\键盘 v9.HEX"), "键盘 v9"),
-            (PurePosixPath("/tmp/Keyboard release.BIN"), "Keyboard release"),
-            ("/tmp/keyboard.release.hex", "keyboard.release"),
+            ("mk20b_via_v9.hex", "mk20b_via_v9_update"),
+            (PureWindowsPath(r"C:\Firmware\键盘 v9.HEX"), "键盘 v9_update"),
+            (PurePosixPath("/tmp/Keyboard release.BIN"), "Keyboard release_update"),
+            ("/tmp/keyboard.release.hex", "keyboard.release_update"),
         )
         for source, expected in cases:
             with self.subTest(source=source):
@@ -18,9 +18,18 @@ class FilenameTests(unittest.TestCase):
 
     def test_default_does_not_depend_on_product_version_or_burn_mode(self):
         name = firmware_stem("mk20b_via_v9.hex")
-        self.assertEqual(package_filename(name, ".exe"), "mk20b_via_v9.exe")
-        self.assertEqual(package_filename(name, ".zip"), "mk20b_via_v9.zip")
-        self.assertEqual(package_filename(name, ".tar.gz"), "mk20b_via_v9.tar.gz")
+        self.assertEqual(package_filename(name, ".exe"), "mk20b_via_v9_update.exe")
+        self.assertEqual(package_filename(name, ".zip"), "mk20b_via_v9_update.zip")
+        self.assertEqual(package_filename(name, ".tar.gz"), "mk20b_via_v9_update.tar.gz")
+
+    def test_firmware_default_does_not_duplicate_existing_update_suffix(self):
+        self.assertEqual(firmware_stem("keyboard_update.hex"), "keyboard_update")
+        self.assertEqual(firmware_stem("keyboard_UPDATE.BIN"), "keyboard_UPDATE")
+
+    def test_custom_name_does_not_require_update_suffix(self):
+        self.assertEqual(package_filename("My keyboard", ".exe"), "My keyboard.exe")
+        self.assertEqual(package_filename("My keyboard_update", ".zip"),
+                         "My keyboard_update.zip")
 
     def test_edited_name_keeps_unicode_and_portably_replaces_invalid_characters(self):
         self.assertEqual(package_filename('客户<>:"/\\|?*\x00\x1f\x7f. ', ".exe"),
@@ -43,7 +52,7 @@ class FilenameTests(unittest.TestCase):
         self.assertEqual(package_filename("COM10", ".exe"), "COM10.exe")
 
     def test_empty_and_extension_only_names_use_safe_fallback(self):
-        self.assertEqual(firmware_stem(".hex"), "firmware")
+        self.assertEqual(firmware_stem(".hex"), "firmware_update")
         self.assertEqual(package_filename("... ", ".exe"), "firmware.exe")
         self.assertEqual(package_filename(".ZIP", ".exe"), "firmware.exe")
         self.assertEqual(package_filename("", ".zip", fallback="客户版本"), "客户版本.zip")

@@ -2,20 +2,22 @@
 
 面向 **WB32FQ95 / QMK Raw HID** 的离线升级包制作工具。制作端包含固件、APP 参数、发布设置及深色的发布文件预览。客户页约 **650 × 550**，采用紧凑进度条和日志布局，保留“让键盘，焕然一新。”和“连接 USB 数据线，剩下的交给我们。”。背景默认白色，可选浅蓝、暖白或深色；背景选择仅改变客户升级页，制作页及发布预览保持一致的深色面板。
 
-输出名称默认来自所选 HEX/BIN 的文件名，例如 `mk20b_via_v9.hex` → `mk20b_via_v9.exe`。名称可单独编辑，不随设备名称、版本或烧录模式追加后缀。匹配、进 Boot 和 Flash 预检查阶段均保持 0%，仅在页面写入和校验后增加百分比。退出 DFU 只发送一次命令，完成日志合并为一次结果。
+输出名称默认来自所选 HEX/BIN 的文件名并加 `_update`，例如 `mk20b_via_v9.hex` → `mk20b_via_v9_update.exe`。名称可单独编辑，不随设备名称、版本或烧录模式变化。匹配、进 Boot 和 Flash 预检查阶段均保持 0%，仅在页面写入和校验后增加百分比。退出 DFU 只发送一次命令，完成日志合并为一次结果。
+
+制作工具左上角显示 **v1.0.0**。右上角「界面背景」提供深色、粉色、黄色、蓝色、绿色、青色、紫色、白色，默认蓝色，发布预览同步配色。客户升级页背景使用发布设置中的独立选项，保持默认白色。显示版本与内部运行模板兼容版本分离，既有运行模板 API 和烧录行为保持不变。
 
 勾选「打开后自动开始」时，客户双击后识别键盘即升级；取消勾选时，连接键盘后需点击开始按钮。单次与工厂连续烧录均可使用。
 
 ## 现在可以使用的文件
 
 - `release/windows-x64/QMK-Firmware-Studio.exe`：Windows 制作端，也可以作为原生升级运行模板。
-- `release/windows-x64/mk20b_via_v9.exe`：单次客户包，默认文件名来自固件。双击后自动识别升级，成功并确认重连后，倒计时 5 秒关闭。
-- `release/windows-x64/factory/mk20b_via_v9.exe`：工厂连续烧录包。与单次示例分目录保存，成功后等待更换下一把，显示成功/失败计数，支持暂停。
+- `release/windows-x64/mk20b_via_v9_update.exe`：单次客户包。双击后自动识别升级，成功并确认重连后，倒计时 5 秒关闭。
+- `release/windows-x64/factory/mk20b_via_v9_update.exe`：工厂连续烧录包。与单次示例分目录保存，成功后等待更换下一把，显示成功/失败计数，支持暂停。
 - `examples/SAMURAI-S751-v0.0.9.qmk`：通用固件数据包，含固件段、参数及 SHA-256。
 - `release/windows-x64.qmk-runtime.zip`：本次 Windows 构建导出的可导入运行模板。
 - `release/QMK-All-System-Templates.zip`：已完成原生构建、启动检查的四系统运行模板集合。
-- `release/macos-arm64/mk20b_via_v9.zip`、`release/macos-x64/mk20b_via_v9.zip`：在 Windows 装包的真实 Mac 示例升级包。
-- `release/linux-x64/mk20b_via_v9.tar.gz`：在 Windows 装包的 Linux 示例升级包。
+- `release/macos-arm64/mk20b_via_v9_update.zip`、`release/macos-x64/mk20b_via_v9_update.zip`：在 Windows 装包的真实 Mac 示例升级包。
+- `release/linux-x64/mk20b_via_v9_update.tar.gz`：在 Windows 装包的 Linux 示例升级包。
 - `maker-preview.png`、`updater-preview.png`、`factory-preview.png`：实际 Qt 界面截图。
 
 **验证范围：** 四系统运行模板已在各自原生 GitHub runner 构建，通过自动化测试、冻结程序启动和安全预览检查；Mac 解压后的应用另通过 `codesign --verify --deep --strict`。Windows 工具已装入四平台模板，可直接选择目标系统。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7 真机运行。Mac 正式对外分发仍需要厂家的 Developer ID 签名和公证。
@@ -26,7 +28,7 @@
 2. USB 和 Raw HID 描述符只有一组时自动填入；多组时在「高级参数」中选择。未识别到的项目允许手动配置，但生成前会提示确认。
 3. 确认 APP 的 VID、PID、Usage Page、Usage ID。这些是**客户当前旧固件**的参数，可以与新固件不同。默认值来自新固件，旧固件不同则必须修改。
 4. Boot 默认 `342D:DFA0`，Raw HID 默认 32 字节、Report ID `00`。Boot 标识、报告参数、APP/BIN 地址和 Boot 恢复选项统一收在「高级参数」中。`0x0B` 固定为 VIA Boot 跳转命令。
-5. 编辑设备名称、版本及独立的「升级包文件名」，选择客户系统、单次/连续模式、「打开后自动开始」及升级页背景，再点击「生成升级包」。文件名初始值取 HEX/BIN 去掉扩展名的部分；系统后缀自动补齐。右侧发布预览使用与制作页相同的深色面板，只显示实际输出名称、系统、模式及启动方式。
+5. 编辑设备名称、版本及独立的「升级包文件名」，选择客户系统、单次/连续模式、「打开后自动开始」及升级页背景，再点击「生成升级包」。文件名初始值取 HEX/BIN 去掉扩展名再加 `_update`；系统后缀自动补齐。右侧发布预览与制作页同步配色，只显示实际输出名称、系统、模式及启动方式。
 
 ## Windows 上生成 Mac / Linux 升级包
 

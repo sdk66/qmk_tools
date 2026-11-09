@@ -141,7 +141,7 @@ def validate_runtime(path, expected_target=None):
             manifest = json.loads(archive.read("runtime.json").decode("utf-8"))
             target = manifest["target"]
             if manifest["format"] != 1 or manifest["runtime_api"] != RUNTIME_API or target not in TARGETS:
-                raise FirmwareError("系统模板版本不兼容，请使用 1.4.0 或更新的模板。")
+                raise FirmwareError("系统模板版本不兼容，请导入当前制作工具配套的模板集合。")
             if expected_target and expected_target != target:
                 raise FirmwareError("选中的模板与客户系统不匹配。")
             root = str(_safe_name(manifest["root"]))

@@ -264,15 +264,17 @@ class UiModeTests(unittest.TestCase):
         self.windows.append(window)
         source = Path(__file__).resolve().parent.parent / "mk20b_via_v9.hex"
         window.load_firmware(source)
-        self.assertEqual(window.output_name.text(), "mk20b_via_v9")
+        self.assertEqual(window.output_name.text(), "mk20b_via_v9_update")
         from qmk_updater.runtimes import TARGETS
         for target, (_, extension) in TARGETS.items():
             window.platform_combo.setCurrentIndex(window.platform_combo.findData(target))
-            self.assertEqual(window.customer_preview.filename.text(), "mk20b_via_v9" + extension)
+            self.assertEqual(window.customer_preview.filename.text(), "mk20b_via_v9_update" + extension)
         window.inputs["product"].setText("Different Product")
         window.inputs["version"].setText("9.9.9")
         window.continuous_mode.setChecked(True)
-        self.assertEqual(window.output_name.text(), "mk20b_via_v9")
+        self.assertEqual(window.output_name.text(), "mk20b_via_v9_update")
+        window.output_name.clear()
+        self.assertTrue(window.customer_preview.filename.text().startswith("mk20b_via_v9_update."))
         window.output_name.setText("客户升级包.exe")
         window.platform_combo.setCurrentIndex(window.platform_combo.findData("macos-arm64"))
         self.assertEqual(window.customer_preview.filename.text(), "客户升级包.zip")
@@ -280,10 +282,35 @@ class UiModeTests(unittest.TestCase):
             binary = Path(temp) / "new_board_v2.bin"
             binary.write_bytes(window.firmware.segments[0].data)
             window.load_firmware(binary)
-            self.assertEqual(window.output_name.text(), "new_board_v2")
+            self.assertEqual(window.output_name.text(), "new_board_v2_update")
             window.output_name.setText("Custom")
             window.reload_bin()
             self.assertEqual(window.output_name.text(), "Custom")
+
+    def test_maker_title_and_blue_default_theme(self):
+        window = MakerWindow()
+        self.windows.append(window)
+        self.assertTrue(window.windowTitle().endswith("v1.0.0"))
+        self.assertEqual(window.maker_theme, "blue")
+        self.assertTrue(window.theme_buttons["blue"].isChecked())
+        self.assertEqual(sum(button.isChecked() for button in window.theme_buttons.values()), 1)
+
+    def test_maker_theme_changes_do_not_leak_into_customer_package_colors(self):
+        window = MakerWindow()
+        self.windows.append(window)
+        window.load_firmware(Path(__file__).resolve().parent.parent / "mk20b_via_v9.hex")
+        original = window.settings()
+        original_style = window.styleSheet()
+        window.theme_buttons["green"].click()
+        self.assertEqual(window.maker_theme, "green")
+        self.assertNotEqual(window.styleSheet(), original_style)
+        self.assertEqual(window.settings(), original)
+        self.assertTrue(window.theme_buttons["green"].isChecked())
+        self.assertFalse(window.theme_buttons["blue"].isChecked())
+        window.theme_buttons["white"].click()
+        self.assertEqual(window.maker_theme, "white")
+        self.assertEqual(window.settings(), original)
+        self.assertEqual(window.customer_preview.styleSheet(), "")
 
 
 if __name__ == "__main__":

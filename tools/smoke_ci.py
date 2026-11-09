@@ -14,7 +14,7 @@ target = args.target
 release = ROOT / "release" / target
 work = ROOT / "build" / "native-smoke"
 work.mkdir(parents=True, exist_ok=True)
-name = Path("mk20b_via_v9.hex").stem
+name = "mk20b_via_v9_update"
 if target.startswith("macos"):
     subprocess.check_call(["/usr/bin/unzip", "-q", str(release / (name + ".zip")), "-d", str(work)])
     app = work / name / (name + ".app")

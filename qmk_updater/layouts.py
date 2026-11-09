@@ -20,12 +20,19 @@ class Panel(Card):
         self.box.setSpacing(8)
 
 
-def apply_compact_theme(widget, accent="#83ADF2", customer=False):
+def apply_compact_theme(widget, accent="#83ADF2", customer=False, background=None):
+    if background is not None:
+        customer = QColor(background).lightness() >= 140
     if customer:
-        background, panel, border, text, muted, edit = "#F4F7FC", "#FFFFFF", "#D5DFEB", "#183757", "#647D98", "#FFFFFF"
+        background, panel, border, text, muted, edit = background or "#F4F7FC", "#FFFFFF", "#D5DFEB", "#183757", "#647D98", "#FFFFFF"
         hover, track, log_text = "#EAF0F9", "#E3E9F2", "#294764"
     else:
-        background, panel, border, text, muted, edit = "#101D2E", "#1A2A3E", "#38516E", "#EDF3FB", "#A8BDDB", "#101D2E"
+        background = background or "#101D2E"
+        if background.upper() == "#101D2E":
+            panel, border = "#1A2A3E", "#38516E"
+        else:
+            panel, border = QColor(background).lighter(135).name(), QColor(background).lighter(235).name()
+        text, muted, edit = "#EDF3FB", "#A8BDDB", background
         hover, track, log_text = "#2C425E", "#0D1928", "#BDCEE5"
     primary_text = "#10263E" if QColor(accent).lightness() > 160 else "#FFFFFF"
     widget.setStyleSheet("""

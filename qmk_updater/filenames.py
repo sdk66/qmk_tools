@@ -18,7 +18,7 @@ def _portable_stem(name, fallback):
 
 
 def firmware_stem(path, fallback="firmware"):
-    """Use a HEX/BIN basename as the editable default, on any host OS.
+    """Use a HEX/BIN basename plus ``_update`` as the editable default.
 
     Both Windows and POSIX separators are understood, even when a firmware
     filename originates on a different operating system from the packager.
@@ -26,7 +26,8 @@ def firmware_stem(path, fallback="firmware"):
     name = os.fspath(path).replace("\\", "/").rsplit("/", 1)[-1]
     if name.lower().endswith((".hex", ".bin")):
         name = name[:-4]
-    return _portable_stem(name, fallback)
+    name = _portable_stem(name, fallback)
+    return name if name.lower().endswith("_update") else name + "_update"
 
 
 def package_filename(name, extension, fallback="firmware"):

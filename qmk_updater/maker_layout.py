@@ -1,20 +1,23 @@
 """Small, packaging-only maker window. Protocol overrides live in a dialog."""
-from . import __version__
+from . import MAKER_DISPLAY_VERSION
 from .qt import *
 from .ui import ROOT, label, button, form_field, show_licenses
 from .layouts import Panel, compact_field, apply_compact_theme
 from .appearance import BACKGROUNDS, CustomerPreview
 from .runtimes import TARGETS, host_target
+from .maker_theme import THEMES, ColorSwatch
 
 
 def build_maker_window(window):
-    window.setWindowTitle("QMK 升级包制作  v" + __version__)
+    window.setWindowTitle("QMK 升级包制作  v" + MAKER_DISPLAY_VERSION)
     window.setWindowIcon(QIcon(str(ROOT / "icon.png")))
     window.resize(960, 610)
     window.setMinimumSize(920, 580)
     window.firmware = None
     window.firmware_path = None
     window.accent = "#83ADF2"
+    window.maker_theme = "blue"
+    window.maker_background = "#101D2E"
     window.inputs = {}
     window.setAcceptDrops(True)
     outer = QWidget()
@@ -31,6 +34,22 @@ def build_maker_window(window):
     title.setStyleSheet("font-size: 22px; font-weight: 700;")
     header.addWidget(title)
     header.addStretch()
+    palette_box = QVBoxLayout()
+    palette_box.setSpacing(3)
+    palette_box.addWidget(label("界面背景", "fieldLabel"))
+    swatches = QHBoxLayout()
+    swatches.setSpacing(5)
+    window.theme_group = QButtonGroup(window)
+    window.theme_buttons = {}
+    for key, name, color, background in THEMES:
+        swatch = ColorSwatch(name, color)
+        window.theme_group.addButton(swatch)
+        window.theme_buttons[key] = swatch
+        swatch.setChecked(key == "blue")
+        swatch.clicked.connect(lambda checked=False, theme=key: window.set_maker_theme(theme))
+        swatches.addWidget(swatch)
+    palette_box.addLayout(swatches)
+    header.addLayout(palette_box)
     box.addLayout(header)
     columns = QHBoxLayout()
     columns.setSpacing(14)
@@ -60,7 +79,7 @@ def build_maker_window(window):
     grid.setHorizontalSpacing(10)
     window.inputs["product"] = compact_field("", "设备名称")
     window.inputs["version"] = compact_field("", "例如 1.0.9")
-    window.output_name = compact_field("", "默认使用 HEX / BIN 文件名，可修改")
+    window.output_name = compact_field("", "默认固件名_update，可修改")
     form_field(grid, 0, 0, "设备名称", window.inputs["product"])
     form_field(grid, 0, 1, "固件版本", window.inputs["version"])
     form_field(grid, 0, 2, "升级包文件名", window.output_name)
@@ -209,5 +228,5 @@ def build_maker_window(window):
     for key in ("app_vid", "app_pid", "usage_page", "usage_id", "boot_vid", "boot_pid"):
         window.inputs[key].textChanged.connect(window.refresh_preview)
     window.base.textChanged.connect(window.refresh_preview)
-    apply_compact_theme(window, window.accent)
+    apply_compact_theme(window, window.accent, background=window.maker_background)
     window.refresh_preview()
