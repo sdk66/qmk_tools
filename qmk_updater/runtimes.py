@@ -23,7 +23,7 @@ from . import __version__
 from .firmware import FirmwareError
 from .package import create_executable, decode_package
 
-RUNTIME_API = 4
+RUNTIME_API = 5
 TARGETS = {
     "windows-x64": ("Windows 7 / 10 / 11 · x64", ".exe"),
     "macos-arm64": ("macOS · Apple Silicon", ".zip"),

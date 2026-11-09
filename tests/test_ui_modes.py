@@ -72,6 +72,8 @@ class UiModeTests(unittest.TestCase):
         window.load_firmware(Path(__file__).resolve().parent.parent / "mk20b_via_v9.hex")
         self.assertEqual(window.settings().burn_mode, "single")
         self.assertTrue(window.settings().auto_start)
+        self.assertTrue(window.settings().allow_boot_recovery)
+        self.assertFalse(hasattr(window, "boot_recovery"))
         self.assertEqual(window.usb_version.text(), "0x0200")
         self.assertIn("5 秒", window.mode_hint.text())
         window.auto_start.setChecked(False)
@@ -311,6 +313,48 @@ class UiModeTests(unittest.TestCase):
         self.assertEqual(window.maker_theme, "white")
         self.assertEqual(window.settings(), original)
         self.assertEqual(window.customer_preview.styleSheet(), "")
+
+    def test_open_waiting_window_automatically_accepts_customer_manual_dfu(self):
+        hardware = StationHardware()
+        hardware.connected = False
+        with patch("qmk_updater.ui.Hardware", return_value=hardware):
+            window = self.updater()
+            window.safe_preview = False
+            window.probe_device()
+            self.wait_until(lambda: window.probe is not None and not window.probe.isRunning())
+            self.assertIsNone(window.worker)
+            self.assertEqual(window.progress_bar.value(), 0)
+            hardware.connected = True
+            hardware.apps, hardware.boots = 0, 1
+            window.probe_device()
+            self.wait_until(lambda: window.session.succeeded == 1)
+            self.assertEqual(hardware.jumps, 0)
+            self.assertEqual(len([c for c in hardware.transport.commands if c and c[0] == 0x83]), 1)
+
+    def test_failed_app_entry_keeps_waiting_and_manual_dfu_continues_without_failure_count(self):
+        from qmk_updater.workflow import upgrade as real_upgrade
+        hardware = StationHardware()
+        hardware.jump_works = False
+        def quick_upgrade(package, device, progress):
+            return real_upgrade(package, device, progress, timeout=.2)
+        with patch("qmk_updater.ui.Hardware", return_value=hardware), \
+             patch("qmk_updater.ui.upgrade", side_effect=quick_upgrade):
+            window = self.updater()
+            window.safe_preview = False
+            window.probe_device()
+            self.wait_until(lambda: window.session.state == "manual_boot")
+            self.assertEqual(hardware.jumps, 1)
+            self.assertEqual((window.session.succeeded, window.session.failed), (0, 0))
+            self.assertFalse(hardware.transport.commands)
+            until = time.monotonic() + .7
+            self.wait_until(lambda: time.monotonic() >= until)
+            self.assertEqual(hardware.jumps, 1)
+            hardware.apps, hardware.boots = 0, 1
+            window.probe_device()
+            self.wait_until(lambda: window.session.succeeded == 1)
+            self.assertEqual(hardware.jumps, 1)
+            self.assertEqual(window.session.failed, 0)
+            self.assertEqual(len([c for c in hardware.transport.commands if c and c[0] == 0x83]), 1)
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ class BurnSession:
     def observe(self, detection):
         if self.state in ("starting", "flashing", "countdown", "done"):
             return "idle"
-        if self.state in ("remove", "failed", "warning"):
+        if self.state in ("remove", "failed", "warning", "manual_boot"):
             # Monitor APP, the NEW firmware's APP, and Boot. USB re-enumeration
             # or an APP VID/PID change must never immediately re-arm a station.
             if detection.empty:
@@ -49,24 +49,29 @@ class BurnSession:
                     self.empty_since = self.clock()
                 elif self.clock() - self.empty_since >= self.REMOVAL_SETTLE:
                     self.empty_since = None
+                    if self.state == "manual_boot" and not self.continuous:
+                        self.enabled = self.settings.auto_start
                     self.state = "waiting"
                     return "next"
             else:
                 self.empty_since = None
-            return "remove" if self.state == "remove" else "blocked"
+            if self.state != "manual_boot":
+                return "remove" if self.state == "remove" else "blocked"
         if self.paused:
             return "paused"
         if (detection.apps > 1 or detection.boots > 1 or detection.targets > 1
                 or (detection.apps and detection.boots) or (detection.targets and detection.boots)
                 or (not self.same_identity and detection.apps and detection.targets)):
             return "multiple"
-        if detection.apps == 1 or (detection.boots == 1 and self.settings.allow_boot_recovery):
+        if self.state == "manual_boot" and not detection.boots:
+            # The APP attempt was already authorized, but its jump failed.
+            # Keep watching for manual DFU without retrying that APP command.
+            return "manual_boot"
+        if detection.apps == 1 or detection.boots == 1:
             if not self.enabled:
                 return "ready"
             self.state = "starting"
             return "start"
-        if detection.boots:
-            return "boot_blocked"
         return "waiting"
 
     def begin(self):
@@ -99,8 +104,16 @@ class BurnSession:
             return None
         return max(0, int(math.ceil(self.close_deadline - self.clock())))
 
+    def wait_for_manual_boot(self):
+        if self.state not in ("starting", "flashing", "failed"):
+            return False
+        self.empty_since = None
+        self.state = "manual_boot"
+        self.enabled = True
+        return True
+
     def retry(self):
-        if self.state in ("failed", "warning"):
+        if self.state in ("failed", "warning", "manual_boot"):
             self.empty_since = None
             self.state = "waiting"
             self.enabled = True

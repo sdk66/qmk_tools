@@ -114,10 +114,10 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(session.observe(Detection(apps=1)), "start")
         self.assertEqual(session.observe(Detection(apps=1)), "idle")
 
-    def test_boot_recovery_must_be_enabled(self):
+    def test_direct_boot_is_available_by_default_and_for_legacy_false_setting(self):
         session = self.make_session(True)
-        self.assertEqual(session.observe(Detection(boots=1)), "boot_blocked")
-        session = self.make_session(True, allow_boot_recovery=True)
+        self.assertEqual(session.observe(Detection(boots=1)), "start")
+        session = self.make_session(True, allow_boot_recovery=False)
         self.assertEqual(session.observe(Detection(boots=1)), "start")
 
     def test_modes_roundtrip_and_legacy_packages_default_to_single(self):

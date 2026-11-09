@@ -334,11 +334,9 @@ class WorkflowTests(unittest.TestCase):
             self.run_upgrade(hardware)
         self.assertFalse(hardware.transport.commands)
 
-    def test_boot_recovery_requires_package_option(self):
+    def test_direct_boot_is_supported_without_a_separate_package_option(self):
         hardware = FakeHardware(0, 1)
-        with self.assertRaises(UpgradeError):
-            self.run_upgrade(hardware)
-        result = self.run_upgrade(hardware, replace(Settings(), allow_boot_recovery=True))
+        result = self.run_upgrade(hardware, replace(Settings(), allow_boot_recovery=False))
         self.assertTrue(result.reconnected)
         self.assertEqual(hardware.jumps, 0)
 

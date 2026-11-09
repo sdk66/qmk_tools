@@ -11,44 +11,82 @@ class Outcome:
     message: str
 
 
+class BootEntryError(UpgradeError):
+    """APP entry failed before opening Boot; manual DFU can still continue."""
+
+    waiting_for_manual_boot = True
+
+
+def _matching_devices(hardware, settings, deadline, clock, sleep):
+    # HID and USB enumeration are separate calls. A manual transition between
+    # them can briefly report the old APP together with its new Boot device.
+    # Rescan that mixed snapshot before rejecting two genuinely present boards.
+    settle_deadline = min(deadline, clock() + 0.5)
+    while True:
+        apps = hardware.app_devices(settings)
+        boots = hardware.boot_devices(settings)
+        if len(apps) > 1 or len(boots) > 1:
+            raise UpgradeError("检测到多把匹配的键盘，请仅连接一把需要升级的键盘。")
+        if not (apps and boots):
+            return apps, boots
+        if clock() >= settle_deadline:
+            raise UpgradeError("另有设备处于 Boot 模式，请拔掉其他待升级设备后重试。")
+        sleep(max(0, min(0.25, settle_deadline - clock())))
+
+
+def _wait_for_source(hardware, settings, deadline, clock, sleep):
+    while True:
+        apps, boots = _matching_devices(hardware, settings, deadline, clock, sleep)
+        if apps or boots:
+            return apps, boots
+        if clock() >= deadline:
+            raise BootEntryError("未找到匹配的键盘。请使用 USB 有线连接，并检查 VID、PID、Usage Page、Usage ID。")
+        # Discovery may have started just as the customer manually entered
+        # Boot. Keep the same attempt alive through that enumeration gap.
+        sleep(max(0, min(0.25, deadline - clock())))
+
+
+def _wait_for_boot(hardware, settings, deadline, clock, sleep, jump_error=None):
+    while True:
+        apps, boots = _matching_devices(hardware, settings, deadline, clock, sleep)
+        if boots and not apps:
+            return boots[0]
+        if jump_error is not None and apps:
+            raise BootEntryError(str(jump_error)) from jump_error
+        if clock() >= deadline:
+            if jump_error is not None:
+                raise BootEntryError(str(jump_error)) from jump_error
+            raise BootEntryError("等待 Boot 超时。请确认固件收到 0x0B 后执行了跳转，并检查 Boot 的 WinUSB 驱动 / USB 权限。")
+        sleep(max(0, min(0.25, deadline - clock())))
+
+
 def upgrade(package, hardware, progress=lambda value, text: None,
             timeout=25.0, clock=time.monotonic, sleep=time.sleep):
     package.settings.validate()
     package.firmware.validate()
     settings = package.settings
     progress(0, "正在匹配键盘的四项 HID 标识…")
-    apps = hardware.app_devices(settings)
-    boots = hardware.boot_devices(settings)
-    if len(apps) > 1 or len(boots) > 1:
-        raise UpgradeError("检测到多把匹配的键盘，请仅连接一把需要升级的键盘。")
-    if apps and boots:
-        raise UpgradeError("另有设备处于 Boot 模式，请拔掉其他待升级设备后重试。")
-    if not apps:
-        if not boots:
-            raise UpgradeError("未找到匹配的键盘。请使用 USB 有线连接，并检查 VID、PID、Usage Page、Usage ID。")
-        if not settings.allow_boot_recovery:
-            raise UpgradeError("键盘已在 Boot 模式，此升级包未开启恢复升级。请由厂家生成允许 Boot 恢复的包。")
-        progress(0, "恢复升级：已找到唯一的 Boot 设备")
+    deadline = clock() + timeout
+    apps, boots = _wait_for_source(hardware, settings, deadline, clock, sleep)
+    if apps:
+        # Re-enumerate immediately before writing Raw HID. The customer may
+        # have pressed their Boot shortcut after the window's discovery pass.
+        apps, boots = _wait_for_source(hardware, settings, deadline, clock, sleep)
+    if boots:
+        progress(0, "已检测到 DFU，直接开始升级…")
         boot = boots[0]
     else:
         progress(0, "已找到键盘，发送 0x0B 进入 Boot…")
-        hardware.jump(apps[0], settings)
-        deadline = clock() + timeout
-        boot = None
-        app_disappeared = False
-        while clock() < deadline:
-            sleep(0.25)
-            current_apps = hardware.app_devices(settings)
-            current_boots = hardware.boot_devices(settings)
-            if len(current_boots) > 1 or len(current_apps) > 1:
-                raise UpgradeError("切换期间出现多个匹配设备，已停止升级。请仅保留目标键盘。")
-            if not current_apps:
-                app_disappeared = True
-            if current_boots and app_disappeared and not current_apps:
-                boot = current_boots[0]
-                break
-        if boot is None:
-            raise UpgradeError("等待 Boot 超时。请确认固件收到 0x0B 后执行了跳转，并检查 Boot 的 WinUSB 驱动 / USB 权限。")
+        try:
+            hardware.jump(apps[0], settings)
+        except (UpgradeError, OSError) as error:
+            # The HID path can disappear immediately after the last scan if
+            # the customer enters Boot manually. Accept only an observed,
+            # unique Boot with no APP, and never retry the 0x0B command.
+            boot = _wait_for_boot(hardware, settings, clock() + timeout,
+                                  clock, sleep, jump_error=error)
+        else:
+            boot = _wait_for_boot(hardware, settings, clock() + timeout, clock, sleep)
     progress(0, "Boot 已连接，正在检查芯片…")
     transport = hardware.open_boot(boot)
     try:

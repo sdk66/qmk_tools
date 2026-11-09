@@ -123,7 +123,7 @@ def build_updater(window):
         window.counts.hide()
     window.message = label("正在等待设备连接…", "cardTitle", True)
     box.addWidget(window.message)
-    window.connection = label("识别到键盘后自动升级。" if s.auto_start else "连接键盘后，点击下方开始升级。", "muted", True)
+    window.connection = label("自动识别正常键盘或 DFU 后升级。" if s.auto_start else "连接正常键盘或 DFU，点击下方开始升级。", "muted", True)
     box.addWidget(window.connection)
     window.progress_bar = QProgressBar()
     window.progress_bar.setRange(0, 100)

@@ -44,6 +44,9 @@ def main():
         settings.auto_start = args.auto_start
     if args.mode:
         settings.burn_mode = args.mode
+    # Both normal APP entry and a customer's manually entered DFU are always
+    # accepted by newly generated packages, including imported old profiles.
+    settings.allow_boot_recovery = True
     if args.background:
         settings.background = args.background
     data = encode_package(Package(settings, firmware))

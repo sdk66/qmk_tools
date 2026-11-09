@@ -23,6 +23,7 @@ class UpdaterWindow(QMainWindow):
         self._last_log_phase = None
         self._handled_worker = None
         self._last_probe_error = ""
+        self._pending_manual_boot = False
         self.log_lines = deque(maxlen=50000)
         from .layouts import build_updater
         build_updater(self)
@@ -33,7 +34,7 @@ class UpdaterWindow(QMainWindow):
         self.countdown_timer.setInterval(1000)
         self.countdown_timer.timeout.connect(self.countdown_tick)
         self.append_log("升级包完整性校验通过，内置固件：" + package.firmware.name)
-        self.append_log("自动等待匹配 VID / PID / Usage Page / Usage ID 的键盘。")
+        self.append_log("持续等待正常键盘或匹配的 DFU；手动进入 DFU 也会识别并升级。")
         self.note.setText(self.mode_note())
         self.refresh_action()
         if safe_preview:
@@ -80,22 +81,23 @@ class UpdaterWindow(QMainWindow):
         self._last_probe_error = ""
         action = self.session.observe(detection)
         if action == "start":
-            self.connection.setText("已找到目标键盘，正在自动开始升级…")
+            self.connection.setText("已识别 DFU，正在直接开始升级…" if detection.boots else "已找到目标键盘，正在自动开始升级…")
             QTimer.singleShot(0, self.start_upgrade)
         elif action == "ready":
-            self.message.setText("键盘已连接，等待开始")
+            self.message.setText("DFU 已连接，等待开始" if detection.boots else "键盘已连接，等待开始")
             self.connection.setText("点击下方「开始连续烧录」后启动工厂烧录。" if self.session.continuous else
                                     "点击下方「开始升级」后开始写入固件。")
         elif action == "multiple":
             self.message.setText("检测到多个匹配设备")
             self.connection.setText("请只保留一把待烧录键盘，程序会自动继续。")
-        elif action == "boot_blocked":
-            self.message.setText("设备已在 Boot / DFU 模式")
-            self.connection.setText("此包未允许直接从 Boot 恢复，请使用对应型号的恢复升级包。")
+        elif action == "manual_boot":
+            self.message.setText("等待手动进入 DFU…")
+            self.connection.setText("保持程序打开，手动进入 DFU 后会自动识别并继续升级。")
         elif action == "remove":
             self.message.setText("本把烧录成功，等待更换下一把")
             self.connection.setText("请拔下已完成的键盘，等待「可连接下一把」提示。")
         elif action == "next":
+            self._pending_manual_boot = False
             self.progress_bar.setValue(0)
             self.message.setText("可连接下一把键盘" if self.session.continuous else "正在等待设备连接…")
             self.connection.setText("检测到目标键盘后将自动开始升级。" if self.session.enabled else
@@ -107,8 +109,8 @@ class UpdaterWindow(QMainWindow):
             self.connection.setText("点击下方「继续自动烧录」恢复。")
         elif action == "waiting":
             self.message.setText("正在等待设备连接…")
-            self.connection.setText("请使用 USB 数据线连接目标键盘，程序会自动开始。" if self.session.enabled else
-                                    "请连接目标键盘，再点击下方开始按钮。")
+            self.connection.setText("连接正常键盘或手动进入 DFU，识别后会自动开始。" if self.session.enabled else
+                                    "请连接正常键盘或进入 DFU，再点击下方开始按钮。")
         self.refresh_action()
 
     def start_upgrade(self):
@@ -128,9 +130,11 @@ class UpdaterWindow(QMainWindow):
         self._last_log_phase = None
         self._handled_worker = None
         self.progress_bar.setValue(0)
-        self.message.setText("正在检查设备并进入 Boot…")
+        self.message.setText("正在确认 APP / DFU 设备状态…")
         self.note.setText("正在烧录，请勿断电、拔出 USB 或关闭程序。")
-        self.append_log("开始第 %d 次烧录。" % (self.session.succeeded + self.session.failed + 1))
+        self.append_log("已手动进入 DFU，继续本次升级。" if self._pending_manual_boot else
+                        "开始第 %d 次烧录。" % (self.session.succeeded + self.session.failed + 1))
+        self._pending_manual_boot = False
         for helper in self.help_buttons:
             helper.setEnabled(False)
         self.refresh_action()
@@ -164,10 +168,25 @@ class UpdaterWindow(QMainWindow):
             QTimer.singleShot(30, lambda: self.upgrade_finished(worker))
             return
         self._handled_worker = worker
-        self.show_outcome(worker.outcome, worker.error)
+        self.show_outcome(worker.outcome, worker.error, bool(getattr(worker, "waiting_for_manual_boot", False)))
 
-    def show_outcome(self, outcome=None, error=""):
+    def show_outcome(self, outcome=None, error="", waiting_for_manual_boot=False):
         self.busy = False
+        if waiting_for_manual_boot:
+            self.session.wait_for_manual_boot()
+            self._pending_manual_boot = True
+            self.progress_bar.setValue(0)
+            self.message.setText("等待手动进入 DFU…")
+            self.connection.setText("自动进入 DFU 未完成：" + error)
+            self.note.setText("保持升级包打开，手动进入 DFU，程序识别后会继续升级。")
+            self.append_log("自动进入 DFU 未完成：" + error)
+            self.append_log("未开始写入固件，继续等待客户手动进入 DFU。")
+            for helper in self.help_buttons:
+                helper.setEnabled(True)
+            self.refresh_action()
+            if not self.safe_preview:
+                self.timer.start()
+            return
         self.session.complete(outcome, error)
         self.counts.setText("成功 %d   /   失败 %d" % (self.session.succeeded, self.session.failed))
         for helper in self.help_buttons:
@@ -219,9 +238,9 @@ class UpdaterWindow(QMainWindow):
         elif state == "countdown":
             self.start_button.setEnabled(False)
             self.start_button.setText("升级完成 · %d 秒后自动关闭" % self.session.remaining())
-        elif state in ("failed", "warning"):
+        elif state in ("failed", "warning", "manual_boot"):
             self.start_button.setEnabled(not self.safe_preview)
-            self.start_button.setText("检查后重新检测并重试")
+            self.start_button.setText("重新检测" if state == "manual_boot" else "检查后重新检测并重试")
         elif not self.session.enabled:
             self.start_button.setEnabled(not self.safe_preview)
             self.start_button.setText("开始连续烧录" if self.session.continuous else "开始升级")

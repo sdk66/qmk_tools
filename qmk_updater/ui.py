@@ -241,6 +241,7 @@ class UpgradeWorker(QThread):
         self.log_lines = []
         self.outcome = None
         self.error = ""
+        self.waiting_for_manual_boot = False
 
     def update(self, percent, message):
         self.log_lines.append("%s  %s" % (datetime.datetime.now().isoformat(timespec="seconds"), message))
@@ -257,6 +258,7 @@ class UpgradeWorker(QThread):
         except Exception as e:
             self.log_lines.append(traceback.format_exc())
             self.error = str(e)
+            self.waiting_for_manual_boot = bool(getattr(e, "waiting_for_manual_boot", False))
         finally:
             lock.unlock()
 
@@ -526,7 +528,7 @@ class MakerWindow(QMainWindow):
                 values[key] = value if key in ("product", "version") else int(value, 10 if key == "report_size" else 16)
             except ValueError:
                 raise FirmwareError("%s 的格式不正确。" % key)
-        values.update(accent=self.accent, auto_start=self.auto_start.isChecked(), allow_boot_recovery=self.boot_recovery.isChecked(),
+        values.update(accent=self.accent, auto_start=self.auto_start.isChecked(), allow_boot_recovery=True,
                       burn_mode="continuous" if self.continuous_mode.isChecked() else "single",
                       background=self.background_combo.currentData())
         usb, hid = self.usb_combo.currentData(), self.hid_combo.currentData()
@@ -582,7 +584,6 @@ class MakerWindow(QMainWindow):
                 self.background_combo.addItem(settings.background, settings.background)
                 background_index = self.background_combo.count() - 1
             self.background_combo.setCurrentIndex(background_index)
-            self.boot_recovery.setChecked(settings.allow_boot_recovery)
             if content.get("output_name"):
                 self.output_name.setText(content["output_name"])
             self.set_accent(settings.accent)

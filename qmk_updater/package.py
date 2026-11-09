@@ -37,7 +37,9 @@ class Settings:
     target_usage_id: int = 0x61
     accent: str = "#83ADF2"
     auto_start: bool = True
-    allow_boot_recovery: bool = False
+    # Kept in the manifest for compatibility with existing packages. Both APP
+    # and a manually entered Boot are always accepted by the runtime.
+    allow_boot_recovery: bool = True
     burn_mode: str = "single"
     background: str = "#FFFFFF"
 
