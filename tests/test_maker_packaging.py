@@ -191,7 +191,7 @@ class MakerPackagingTests(unittest.TestCase):
                 # removing the mocked builder or deleting any Qt objects.
                 self.wait_until(lambda: window.pack_worker is None)
 
-        self.assertEqual(window.generate.text(), "生成升级程序")
+        self.assertEqual(window.generate.text(), "生成升级包")
         for widget, enabled in original_states.items():
             self.assertEqual(widget.isEnabled(), enabled)
         self.assertEqual(window._pack_controls, [])

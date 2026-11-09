@@ -660,6 +660,7 @@ class MakerWindow(QMainWindow):
                 start = "打开后识别键盘即开始。" if settings.auto_start else "打开后需点击开始按钮。"
                 self._pack_description = start + ("完成后等待更换下一把。" if settings.burn_mode == "continuous" else
                                                   "成功退出 DFU 后倒计时 5 秒关闭。")
+                self._pack_button_text = self.generate.text()
                 self._pack_controls = [(widget, widget.isEnabled()) for widget in self.findChildren(QWidget)
                                        if isinstance(widget, (QLineEdit, QComboBox, QAbstractButton))]
                 for widget, _ in self._pack_controls:
@@ -685,7 +686,7 @@ class MakerWindow(QMainWindow):
         for widget, enabled in self._pack_controls:
             widget.setEnabled(enabled)
         self._pack_controls = []
-        self.generate.setText("生成升级程序")
+        self.generate.setText(self._pack_button_text)
         if worker.error:
             self.status.setText("打包失败：" + worker.error)
             QMessageBox.warning(self, "升级包未生成", worker.error)
