@@ -60,6 +60,8 @@ jobs:
           python tools/make_package.py --firmware mk20b_via_v9.hex --runtime release/${{ matrix.platform }}.qmk-runtime.zip --output release/${{ matrix.platform }}/SAMURAI-S751-v0.0.9.zip
           python tools/make_package.py --firmware mk20b_via_v9.hex --mode continuous --runtime release/${{ matrix.platform }}.qmk-runtime.zip --output release/${{ matrix.platform }}/SAMURAI-S751-v0.0.9-factory.zip
       - name: Archive release (preserve executable bits and app symlinks)
+        run: python tools/smoke_ci.py --target ${{ matrix.platform }}
+      - name: Archive release (preserve executable bits and app symlinks)
         shell: bash
         run: tar -czf "release/${{ matrix.platform }}.tar.gz" -C release "${{ matrix.platform }}"
       - uses: actions/upload-artifact@v4
