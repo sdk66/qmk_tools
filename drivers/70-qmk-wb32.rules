@@ -3,4 +3,5 @@
 # Then: sudo udevadm control --reload-rules
 # Reconnect the keyboard. Run the updater as your regular desktop user.
 SUBSYSTEM=="usb", ATTR{idVendor}=="342d", ATTR{idProduct}=="dfa0", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="342d", ATTR{idProduct}=="e594", MODE="0660", TAG+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="342d", ATTRS{idProduct}=="e594", MODE="0660", TAG+="uaccess"

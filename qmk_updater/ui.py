@@ -143,8 +143,9 @@ def connection_help(parent, settings):
             path, _ = QFileDialog.getSaveFileName(dialog, "导出 udev 规则", "70-qmk-wb32.rules", "udev 规则 (*.rules)")
             if path:
                 content = ('SUBSYSTEM=="usb", ATTR{idVendor}=="%04x", ATTR{idProduct}=="%04x", MODE="0660", TAG+="uaccess"\n'
+                           'SUBSYSTEM=="usb", ATTR{idVendor}=="%04x", ATTR{idProduct}=="%04x", MODE="0660", TAG+="uaccess"\n'
                            'KERNEL=="hidraw*", ATTRS{idVendor}=="%04x", ATTRS{idProduct}=="%04x", MODE="0660", TAG+="uaccess"\n') % (
-                               settings.boot_vid, settings.boot_pid, settings.app_vid, settings.app_pid)
+                               settings.boot_vid, settings.boot_pid, settings.app_vid, settings.app_pid, settings.app_vid, settings.app_pid)
                 Path(path).write_text(content, encoding="utf-8")
         export.clicked.connect(export_rule)
         box.addWidget(export)

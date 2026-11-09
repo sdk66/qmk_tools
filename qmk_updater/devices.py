@@ -12,6 +12,8 @@ def usb_backend():
         # Linux distributions can provide libusb independently of the wheel.
         backend = usb.backend.libusb1.get_backend()
     if backend is None:
+        if sys.platform.startswith("linux"):
+            raise UpgradeError("USB 服务未就绪，请检查 USB 连接和系统 libusb；虚拟机需启用 USB 直通。")
         raise UpgradeError("USB 后端无法加载，请使用完整的官方升级包。")
     return backend
 

@@ -31,7 +31,13 @@ else:
 env = os.environ.copy()
 env["QT_QPA_PLATFORM"] = "offscreen"
 env["PYUSB_DEBUG"] = "debug"
+env["LIBUSB_DEBUG"] = "4"
 if target.startswith("linux"):
+    # This old libusb release requires a non-empty USB bus directory even on
+    # a headless runner. An empty bus folder is sufficient; no device is made.
+    usb_bus = Path("/dev/bus/usb")
+    if not usb_bus.exists() or not any(not p.name.startswith(".") for p in usb_bus.iterdir()):
+        subprocess.check_call(["sudo", "mkdir", "-p", "/dev/bus/usb/001"])
     subprocess.check_call([sys.executable, str(ROOT / "main.py"), "--diagnostics",
                            str(work / "source-diagnostics.json")], env=env)
 subprocess.check_call([sys.executable, str(ROOT / "tools" / "smoke_test.py"), str(executable),
