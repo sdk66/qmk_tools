@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libhidapi-hidraw0 libusb-1.0-0
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxkbcommon-x11-0 libhidapi-hidraw0 libusb-1.0-0
       - run: python -m pip install -r ${{ matrix.requirements }}
       - run: python -m unittest discover -s tests -v
       - run: python tools/build.py --clean
@@ -59,7 +59,7 @@ jobs:
         run: |
           python tools/make_package.py --firmware mk20b_via_v9.hex --runtime release/${{ matrix.platform }}.qmk-runtime.zip --output release/${{ matrix.platform }}/SAMURAI-S751-v0.0.9.zip
           python tools/make_package.py --firmware mk20b_via_v9.hex --mode continuous --runtime release/${{ matrix.platform }}.qmk-runtime.zip --output release/${{ matrix.platform }}/SAMURAI-S751-v0.0.9-factory.zip
-      - name: Archive release (preserve executable bits and app symlinks)
+      - name: Verify frozen startup and macOS application signatures
         run: python tools/smoke_ci.py --target ${{ matrix.platform }}
       - name: Archive release (preserve executable bits and app symlinks)
         shell: bash

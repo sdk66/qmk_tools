@@ -51,6 +51,10 @@ def main():
                "--add-data", "THIRD_PARTY_NOTICES.md" + os.pathsep + "."]
     if args.clean:
         command.append("--clean")
+    if sys.platform.startswith("linux"):
+        # setuptools' vendored jaraco.context imports this namespace lazily;
+        # the pkg_resources runtime hook needs it in the frozen application.
+        command.extend(["--hidden-import", "backports", "--collect-submodules", "backports.tarfile"])
     if sys.platform == "darwin":
         command.extend(["--onedir", "--osx-bundle-identifier", "local.qmk.firmwarestudio"])
     else:

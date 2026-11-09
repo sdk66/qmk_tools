@@ -4,3 +4,4 @@ hidapi==0.14.0.post4
 pyusb==1.2.1
 libusb-package==1.0.26.2
 PyInstaller==6.12.0
+backports.tarfile==1.2.0; sys_platform == "linux"
