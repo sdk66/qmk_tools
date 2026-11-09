@@ -216,6 +216,32 @@ class MakerPackagingTests(unittest.TestCase):
         self.assertEqual(self.warning.call_args.args[1:], ("升级包未生成", "测试输出目录不可写"))
         self.information.assert_not_called()
 
+    def test_packaging_worker_startup_failures_leave_the_maker_usable(self):
+        for phase in ("construction", "start"):
+            with self.subTest(phase=phase):
+                window = self.new_window(load=True)
+                previous_text = window.generate.text()
+                states = {widget: widget.isEnabled() for widget in (
+                    window.generate, window.inputs["product"], window.platform_combo,
+                    window.auto_start, window.base, window.apply_base)}
+                destination = self.output_directory / (phase + ".exe")
+                failing = (patch("qmk_updater.ui.PackagingWorker", side_effect=RuntimeError("测试线程创建失败"))
+                           if phase == "construction" else
+                           patch("qmk_updater.ui.PackagingWorker.start", side_effect=RuntimeError("测试线程启动失败")))
+                with patch("qmk_updater.ui.QFileDialog.getSaveFileName", return_value=(str(destination), "")), \
+                        failing:
+                    window.generate_package()
+                self.assertIsNone(window.pack_worker)
+                self.assertEqual(window._pack_controls, [])
+                self.assertEqual(window.generate.text(), previous_text)
+                for widget, enabled in states.items():
+                    self.assertEqual(widget.isEnabled(), enabled)
+                self.assertIn("打包失败", window.status.text())
+                self.assertTrue(window.close())
+                self.assertFalse(destination.exists())
+                self.information.assert_not_called()
+        self.assertEqual(self.warning.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

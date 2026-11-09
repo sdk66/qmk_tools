@@ -661,32 +661,40 @@ class MakerWindow(QMainWindow):
                 self._pack_description = start + ("完成后等待更换下一把。" if settings.burn_mode == "continuous" else
                                                   "成功退出 DFU 后倒计时 5 秒关闭。")
                 self._pack_button_text = self.generate.text()
-                self._pack_controls = [(widget, widget.isEnabled()) for widget in self.findChildren(QWidget)
-                                       if isinstance(widget, (QLineEdit, QComboBox, QAbstractButton))]
-                for widget, _ in self._pack_controls:
-                    widget.setEnabled(False)
                 worker = PackagingWorker(template, destination, data, target, self)
                 self.pack_worker = worker
                 worker.progress.connect(self.packaging_progress)
                 worker.finished.connect(self.packaging_finished)
+                self._pack_controls = [(widget, widget.isEnabled()) for widget in self.findChildren(QWidget)
+                                       if isinstance(widget, (QLineEdit, QComboBox, QAbstractButton))]
+                for widget, _ in self._pack_controls:
+                    widget.setEnabled(False)
                 self.packaging_progress(0, "正在准备升级包…")
                 worker.start()
         except Exception as e:
+            if self.pack_worker is not None and not self.pack_worker.isRunning():
+                self.pack_worker.deleteLater()
+                self.pack_worker = None
+                self.restore_packaging_controls()
+            self.status.setText("打包失败：" + str(e))
             QMessageBox.warning(self, "升级包未生成", str(e))
 
     def packaging_progress(self, value, message):
         self.generate.setText("生成中 %d%%" % value)
         self.status.setText(message)
 
+    def restore_packaging_controls(self):
+        for widget, enabled in self._pack_controls:
+            widget.setEnabled(enabled)
+        self._pack_controls = []
+        self.generate.setText(self._pack_button_text)
+
     def packaging_finished(self):
         worker = self.pack_worker
         if worker is None or worker.isRunning():
             return
         self.pack_worker = None
-        for widget, enabled in self._pack_controls:
-            widget.setEnabled(enabled)
-        self._pack_controls = []
-        self.generate.setText(self._pack_button_text)
+        self.restore_packaging_controls()
         if worker.error:
             self.status.setText("打包失败：" + worker.error)
             QMessageBox.warning(self, "升级包未生成", worker.error)
