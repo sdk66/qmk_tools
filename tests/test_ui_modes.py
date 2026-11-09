@@ -41,6 +41,9 @@ class UiModeTests(unittest.TestCase):
 
     def setUp(self):
         self.windows = []
+        self.preferences_temp = tempfile.TemporaryDirectory()
+        self.preferences_patch = patch.dict(os.environ, {"QMK_PREFERENCES_PATH": str(Path(self.preferences_temp.name) / "preferences.json")})
+        self.preferences_patch.start()
         self.hardware_patch = patch("qmk_updater.ui.Hardware", side_effect=AssertionError("Real USB is forbidden in UI tests"))
         self.hardware_patch.start()
 
@@ -58,6 +61,8 @@ class UiModeTests(unittest.TestCase):
             window.deleteLater()
         self.app.processEvents()
         self.hardware_patch.stop()
+        self.preferences_patch.stop()
+        self.preferences_temp.cleanup()
 
     def updater(self, continuous=False, auto_start=True):
         window = UpdaterWindow(Package(replace(Settings(), burn_mode="continuous" if continuous else "single", auto_start=auto_start), image()), safe_preview=True)
@@ -130,6 +135,7 @@ class UiModeTests(unittest.TestCase):
                  patch("subprocess.run", side_effect=AssertionError("No host-specific commands allowed")):
                 window.platform_combo.setCurrentIndex(window.platform_combo.findData("macos-arm64"))
                 window.generate_package()
+                self.wait_until(lambda: window.pack_worker is None)
                 warning.assert_not_called()
             with zipfile.ZipFile(destination) as archive:
                 settings = decode_package(archive.read("keyboard/" + PAYLOAD_NAME)).settings

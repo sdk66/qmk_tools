@@ -4,9 +4,13 @@
 
 输出名称默认来自所选 HEX/BIN 的文件名并加 `_update`，例如 `mk20b_via_v9.hex` → `mk20b_via_v9_update.exe`。名称可单独编辑，不随设备名称、版本或烧录模式变化。匹配、进 Boot 和 Flash 预检查阶段均保持 0%，仅在页面写入和校验后增加百分比。退出 DFU 只发送一次命令，完成日志合并为一次结果。
 
-制作工具左上角显示 **v1.0.0**。右上角「界面背景」提供深色、粉色、黄色、蓝色、绿色、青色、紫色、白色，默认蓝色，发布预览同步配色。客户升级页背景使用发布设置中的独立选项，保持默认白色。显示版本与内部运行模板兼容版本分离，既有运行模板 API 和烧录行为保持不变。
+制作工具左上角显示 **v1.0.0**。右上角「界面背景」提供深色、粉色、黄色、蓝色、绿色、青色、紫色、白色，默认蓝色，发布预览同步配色。客户升级页背景使用发布设置中的独立选项，保持默认白色。显示版本与内部运行模板兼容版本分离；本轮内部版本为 **1.6.0 / Runtime API 6**。
 
 勾选「打开后自动开始」时，客户双击后识别键盘即升级；取消勾选时，连接键盘后需点击开始按钮。单次与工厂连续烧录均可使用。
+
+制作端分别记住上次选择固件的目录和上次生成升级包的目录，重新打开后仍可使用。两者互不覆盖，取消选择也不会更改记录。若记录的文件夹已被移动或删除，会打开仍存在的上级目录。
+
+打包改为后台任务，处理期间界面保持响应并显示状态。客户 EXE 仍需包含 Python、Qt 图形界面和 USB 依赖，固件本身只占很小一部分。本轮裁剪未使用的 Qt 库后，Windows 可执行文件对比原构建约缩小 **39%**；其他系统及后续依赖版本的实际大小可能不同。压缩、完整性检查和磁盘写入仍需要一定时间。
 
 ## 现在可以使用的文件
 
@@ -20,7 +24,7 @@
 - `release/linux-x64/mk20b_via_v9_update.tar.gz`：在 Windows 装包的 Linux 示例升级包。
 - `maker-preview.png`、`updater-preview.png`、`factory-preview.png`：实际 Qt 界面截图。
 
-**验证范围：** 四系统运行模板已在各自原生 GitHub runner 构建，通过自动化测试、冻结程序启动和安全预览检查；Mac 解压后的应用另通过 `codesign --verify --deep --strict`。Windows 工具已装入四平台模板，可直接选择目标系统。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7 真机运行。Mac 正式对外分发仍需要厂家的 Developer ID 签名和公证。
+**验证范围：** 上一版 1.5.0 / API 5 的四系统运行模板已在各自原生 GitHub runner 构建，通过自动化测试、冻结程序启动和安全预览检查；Mac 解压后的应用另通过 `codesign --verify --deep --strict`。本轮 1.6.0 / API 6 的最终构建验证单独记录在 [VALIDATION.md](VALIDATION.md)。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7 真机运行。Mac 正式对外分发仍需要厂家的 Developer ID 签名和公证。
 
 ## 制作升级包
 
@@ -28,7 +32,7 @@
 2. USB 和 Raw HID 描述符只有一组时自动填入；多组时在「高级参数」中选择。未识别到的项目允许手动配置，但生成前会提示确认。
 3. 确认 APP 的 VID、PID、Usage Page、Usage ID。这些是**客户当前旧固件**的参数，可以与新固件不同。默认值来自新固件，旧固件不同则必须修改。
 4. Boot 默认 `342D:DFA0`，Raw HID 默认 32 字节、Report ID `00`。Boot 标识、报告参数和 APP/BIN 地址收在「高级参数」中。APP 与手动 DFU 两种入口始终同时可用，不需要额外开关；`0x0B` 固定为 VIA Boot 跳转命令。
-5. 编辑设备名称、版本及独立的「升级包文件名」，选择客户系统、单次/连续模式、「打开后自动开始」及升级页背景，再点击「生成升级包」。文件名初始值取 HEX/BIN 去掉扩展名再加 `_update`；系统后缀自动补齐。右侧发布预览与制作页同步配色，只显示实际输出名称、系统、模式及启动方式。
+5. 编辑设备名称、版本及独立的「升级包文件名」，选择客户系统、单次/连续模式、「打开后自动开始」及升级页背景，再点击「生成升级包」。文件名初始值取 HEX/BIN 去掉扩展名再加 `_update`；系统后缀自动补齐。保存位置独立记忆，不会随固件选择目录变化。右侧发布预览与制作页同步配色，只显示实际输出名称、系统、模式及启动方式。打包期间等待后台任务完成即可。
 
 ## Windows 上生成 Mac / Linux 升级包
 
@@ -46,7 +50,7 @@
 
 Mac 包保留模板 `.app` 内所有文件字节和框架符号链接，把固件与设置放在应用旁的隐藏 `.qmk-update` 中。因此 Windows 装包不调用 `codesign`，不修改已签名 `.app` 的资源。客户需保留整个解压文件夹，不能只把 `.app` 单独移走。隐藏固件包仍使用本项目的 SHA-256 完整性校验。
 
-**当前交付包含四系统真实运行模板，制作工具标题显示 v1.0.0。** APP/手动 DFU 双路径的最终构建与成品启动验证见 [GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42576005364)，源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。内部运行版本为 1.5.0 / API 5。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
+**制作工具标题保持 v1.0.0，本轮运行模板需要 1.6.0 / API 6。** 使用新模板重新生成客户包，已有客户 EXE 不会自动获得本轮 USB 连接处理改进。此前 APP/手动 DFU 双路径的原生构建与成品启动验证见 [1.5.0 版 GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42576005364)，该记录对应 API 5；本轮结果见 [VALIDATION.md](VALIDATION.md)。源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
 
 ## 单次与连续烧录
 
@@ -86,6 +90,8 @@ HIDAPI 发送缓冲区为 `00 0B 00 …`，第一个 `00` 是 HIDAPI 要求的 R
 | Linux x64 | 在 Ubuntu 22.04 构建，Qt 6.8.3 | 桌面图形环境及 udev 权限；更老的 glibc 发行版需在其上另行构建 |
 
 Windows **APP Raw HID 使用系统 HID 驱动**。只对 `WB Device in DFU Mode (342D:DFA0)` 使用 WinUSB，不要替换正常键盘接口的 HID 驱动。官方驱动包既放在 `drivers/windows/`，也内置在客户程序中。客户可从「连接帮助」启动厂商安装器，Windows 会请求管理员授权。程序不会静默修改系统驱动。如果客户已经能通过 QMK Toolbox 烧录，通常已有正确的 Boot 驱动。
+
+从 APP 切换到 DFU 后，系统枚举出设备与 USB 接口可访问之间可能存在短暂间隔。程序会在发送任何固件命令前，对可恢复的打开接口错误进行有上限的等待和重试。持续失败时保留原始错误，并区分接口占用、连接断开、访问权限和驱动不兼容；不会把所有 USB 打开失败都提示为“未安装 WinUSB”。真正缺少 Boot 驱动时仍需完成首次安装。该等待不重发 `0x0B`，也不重试擦除、写入、校验或退出 DFU 命令。
 
 Linux 的示例规则在 `drivers/70-qmk-wb32.rules`，首次由管理员执行：
 
@@ -148,7 +154,7 @@ sudo apt-get install libegl1 libopengl0 libxcb-cursor0 libxcb-icccm4 libxcb-keys
 
 `.github/workflows/build.yml` 包含 Windows x64、macOS Intel/ARM64、Linux x64 四个原生构建任务。每个任务导出运行模板并制作示例客户包，再验证冻结程序启动；最后汇总成 `QMK-All-System-Templates.zip`，供 Windows 工具一次性导入。下载 GitHub artifact 后，如外面还有一层 ZIP，先解压取得这个模板集合文件。推送构建分支会自动重新构建，工作流合入默认分支后也可手动触发。
 
-每次 `tools/build.py` 构建都会在 `release/` 导出对应 `.qmk-runtime.zip`。模板需为 **1.5.0 / Runtime API 5**，以支持 APP/手动 DFU 双路径、切换竞态处理与自动入口失败后的持续等待。制作工具标题仍显示 v1.0.0。导入后的目录位于制作工具旁：
+每次 `tools/build.py` 构建都会在 `release/` 导出对应 `.qmk-runtime.zip`。本轮模板需为 **1.6.0 / Runtime API 6**，包含 APP/手动 DFU 双路径、切换竞态处理、自动入口失败后的持续等待及 Boot 接口就绪等待。旧 API 5 模板需要重新构建或导入新版。制作工具标题仍显示 v1.0.0。导入后的目录位于制作工具旁：
 
 ```text
 templates/
@@ -159,6 +165,8 @@ templates/
 ```
 
 Windows/Linux 从模板复制可执行文件并嵌入包数据；Mac 从模板复制完整应用与外部固件包，三个系统的装包代码均可在 Windows 运行。运行模板的首次构建仍需要对应平台，因为 [PyInstaller 本身不是跨系统编译器](https://github.com/pyinstaller/pyinstaller#pyinstaller-overview)。Windows 代码签名应在生成最终客户 EXE 后进行；重打包会移除模板旧签名。
+
+制作端目录记忆使用独立的用户 JSON 文件：Windows 为 `%LOCALAPPDATA%\QMK-Firmware-Studio\preferences.json`，macOS 为 `~/Library/Application Support/QMK-Firmware-Studio/preferences.json`，Linux 为 `$XDG_CONFIG_HOME/QMK-Firmware-Studio/preferences.json`（未设置时使用 `~/.config`）。测试或便携部署可通过 `QMK_PREFERENCES_PATH` 指定其他位置。目录记录只属于制作端，不写入客户固件包；设置文件损坏或无法写入不会阻止打包。
 
 命令行制作、检查和安全预览：
 

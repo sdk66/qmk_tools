@@ -4,6 +4,42 @@ import sys
 from .wb32 import UpgradeError
 
 
+class BootAccessError(UpgradeError):
+    """Opening/claiming Boot failed before any firmware commands were sent."""
+
+    def __init__(self, message, retryable=False):
+        super().__init__(message)
+        self.retryable = retryable
+
+
+def _boot_access_error(error):
+    import usb.core
+
+    # PyUSB 1.2 maps LIBUSB_ERROR_NOT_SUPPORTED to NotImplementedError,
+    # while the other libusb failures retain their backend_error_code.
+    code = (-12 if isinstance(error, NotImplementedError)
+            else getattr(error, "backend_error_code", None))
+    usb_error = isinstance(error, (usb.core.USBError, NotImplementedError))
+    retryable = usb_error and code in (-1, -3, -4, -5, -6, -7, -10, -12)
+    if sys.platform == "win32" and code == -12:
+        message = ("Boot USB 接口尚未就绪或驱动不兼容。若重新连接后仍失败，"
+                   "请检查 WB Device in DFU Mode 的 WinUSB 驱动。")
+    elif code == -6:
+        message = "Boot USB 接口正被占用，请关闭其他键盘升级工具后重试。"
+    elif code == -4:
+        message = "Boot USB 连接已断开，请检查 USB 数据线并重新连接键盘。"
+    elif sys.platform.startswith("linux") and code == -3:
+        message = "Boot USB 访问被拒绝，请安装升级包中的 Linux udev 规则后重新插拔键盘。"
+    elif code == -3:
+        message = "Boot USB 访问被拒绝，请关闭其他键盘工具并检查 USB 访问权限。"
+    else:
+        message = "无法打开 Boot USB 接口，请检查 USB 连接并关闭其他键盘工具后重试。"
+    detail = str(error)
+    if code is not None:
+        detail += " (libusb %d)" % code
+    return BootAccessError(message + "原始错误：" + detail, retryable=retryable)
+
+
 def usb_backend():
     import usb.backend.libusb1
     import libusb_package
@@ -62,8 +98,8 @@ class UsbTransport:
         import usb.util
         self.device = device
         self.claimed = False
-        self.packet_size = int(device.bMaxPacketSize0)
         try:
+            self.packet_size = int(device.bMaxPacketSize0)
             config = device.get_active_configuration()
             if config is None:
                 device.set_configuration()
@@ -89,11 +125,7 @@ class UsbTransport:
             self.close()
             if isinstance(e, UpgradeError):
                 raise
-            if sys.platform == "win32":
-                raise UpgradeError("无法访问 Boot。请先为 WB Device in DFU Mode 安装 WinUSB 驱动。原始错误：%s" % e)
-            if sys.platform.startswith("linux"):
-                raise UpgradeError("无法访问 Boot。请安装升级包中的 Linux udev 规则后重新插拔键盘。原始错误：%s" % e)
-            raise UpgradeError("无法访问 Boot，请关闭其他键盘工具并检查 USB 权限：%s" % e)
+            raise _boot_access_error(e) from e
 
     def write(self, data):
         return self.device.write(0x01, data, timeout=5000)
@@ -109,4 +141,8 @@ class UsbTransport:
             except Exception:
                 pass
             self.claimed = False
-        usb.util.dispose_resources(self.device)
+        try:
+            usb.util.dispose_resources(self.device)
+        except Exception:
+            # Removal during the handover must not hide the original error.
+            pass

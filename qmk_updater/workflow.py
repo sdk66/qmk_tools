@@ -2,7 +2,14 @@
 import time
 from dataclasses import dataclass
 
+from .devices import BootAccessError
 from .wb32 import Wb32, UpgradeError
+
+
+# Enumeration can precede a usable driver handle. Retry only opening Boot,
+# with fresh discovery and the same one-board guards; never replay firmware I/O.
+BOOT_READY_TIMEOUT = 5.0
+BOOT_READY_POLL = 0.25
 
 
 @dataclass(frozen=True)
@@ -60,6 +67,29 @@ def _wait_for_boot(hardware, settings, deadline, clock, sleep, jump_error=None):
         sleep(max(0, min(0.25, deadline - clock())))
 
 
+def _open_ready_boot(hardware, settings, boot, progress, timeout, clock, sleep):
+    deadline = clock() + min(timeout, BOOT_READY_TIMEOUT)
+    notified = False
+    while True:
+        try:
+            return hardware.open_boot(boot)
+        except BootAccessError as error:
+            if not error.retryable:
+                raise
+            last_error = error
+        if not notified:
+            progress(0, "Boot 已识别，正在等待 USB 接口就绪…")
+            notified = True
+        while True:
+            if clock() >= deadline:
+                raise last_error
+            sleep(min(BOOT_READY_POLL, deadline - clock()))
+            apps, boots = _matching_devices(hardware, settings, deadline, clock, sleep)
+            if boots and not apps:
+                boot = boots[0]
+                break
+
+
 def upgrade(package, hardware, progress=lambda value, text: None,
             timeout=25.0, clock=time.monotonic, sleep=time.sleep):
     package.settings.validate()
@@ -88,7 +118,8 @@ def upgrade(package, hardware, progress=lambda value, text: None,
         else:
             boot = _wait_for_boot(hardware, settings, clock() + timeout, clock, sleep)
     progress(0, "Boot 已连接，正在检查芯片…")
-    transport = hardware.open_boot(boot)
+    transport = _open_ready_boot(hardware, settings, boot, progress,
+                                 timeout, clock, sleep)
     try:
         flasher = Wb32(transport)
         flasher.flash(package.firmware, progress)

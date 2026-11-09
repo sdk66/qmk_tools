@@ -20,6 +20,8 @@ from .workflow import upgrade
 from .session import Detection
 from .runtimes import TARGETS, host_target, templates_directory, install_runtime, system_package
 from .filenames import firmware_stem, package_filename
+from .preferences import MakerPreferences
+from .packaging_job import PackagingWorker
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 
@@ -387,8 +389,12 @@ class DeviceDialog(QDialog):
 
 
 class MakerWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, preferences=None):
         super().__init__()
+        self.preferences = preferences if preferences is not None else MakerPreferences()
+        self.pack_worker = None
+        self._pack_controls = []
+        self._pack_description = ""
         from .layouts import build_maker
         build_maker(self)
 
@@ -430,8 +436,9 @@ class MakerWindow(QMainWindow):
                 self.platform_status.setText("需先导入 %s 运行模板，支持在当前电脑装包" % TARGETS[target][0])
 
     def select_firmware(self):
-        path, _ = QFileDialog.getOpenFileName(self, "选择 Q95 固件", "", "QMK 固件 (*.hex *.bin)")
+        path, _ = QFileDialog.getOpenFileName(self, "选择 Q95 固件", self.preferences.directory("firmware"), "QMK 固件 (*.hex *.bin)")
         if path:
+            self.preferences.remember_file("firmware", path)
             self.load_firmware(path)
 
     def load_firmware(self, path):
@@ -546,8 +553,9 @@ class MakerWindow(QMainWindow):
     def save_project(self):
         try:
             settings = self.settings()
-            path, _ = QFileDialog.getSaveFileName(self, "保存制作配置", "qmk-project.json", "JSON 配置 (*.json)")
+            path, _ = QFileDialog.getSaveFileName(self, "保存制作配置", str(Path(self.preferences.directory("project")) / "qmk-project.json"), "JSON 配置 (*.json)")
             if path:
+                self.preferences.remember_file("project", path)
                 content = {"settings": asdict(settings), "firmware": str(self.firmware_path or ""),
                            "bin_base": self.base.text(), "usb_index": self.usb_combo.currentIndex(),
                            "hid_index": self.hid_combo.currentIndex(), "output_name": self.output_name.text(),
@@ -558,9 +566,10 @@ class MakerWindow(QMainWindow):
             QMessageBox.warning(self, "配置未保存", str(e))
 
     def load_project(self):
-        path, _ = QFileDialog.getOpenFileName(self, "载入制作配置", "", "JSON 配置 (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, "载入制作配置", self.preferences.directory("project"), "JSON 配置 (*.json)")
         if not path:
             return
+        self.preferences.remember_file("project", path)
         try:
             content = json.loads(Path(path).read_text(encoding="utf-8"))
             settings = Settings(**content["settings"])
@@ -608,9 +617,10 @@ class MakerWindow(QMainWindow):
         raise FirmwareError("请先导入 %s 系统模板；导入后可在当前电脑生成对应升级包。" % TARGETS[target][0])
 
     def import_runtime(self):
-        source, _ = QFileDialog.getOpenFileName(self, "导入一个或全部系统的运行模板", "", "系统模板 (*.qmk-runtime.zip *.zip)")
+        source, _ = QFileDialog.getOpenFileName(self, "导入一个或全部系统的运行模板", self.preferences.directory("template"), "系统模板 (*.qmk-runtime.zip *.zip)")
         if not source:
             return
+        self.preferences.remember_file("template", source)
         try:
             targets = install_runtime(source, templates_directory())
             if len(targets) == 1:
@@ -621,6 +631,8 @@ class MakerWindow(QMainWindow):
             QMessageBox.warning(self, "模板未导入", str(error))
 
     def generate_package(self):
+        if self.pack_worker is not None:
+            return
         try:
             if not self.firmware:
                 raise FirmwareError("请先选择固件。")
@@ -638,27 +650,66 @@ class MakerWindow(QMainWindow):
             template = self.template(target)
             extension = TARGETS[target][1]
             suggested_name = package_filename(self.output_name.text(), extension, firmware_stem(self.firmware_path))
-            destination, _ = QFileDialog.getSaveFileName(self, "生成 %s 升级包" % TARGETS[target][0], suggested_name)
+            suggested_path = str(Path(self.preferences.directory("output")) / suggested_name)
+            destination, _ = QFileDialog.getSaveFileName(self, "生成 %s 升级包" % TARGETS[target][0], suggested_path)
             if destination:
                 destination_path = Path(destination)
                 destination = str(destination_path.with_name(package_filename(destination_path.name, extension,
                                                                                firmware_stem(self.firmware_path))))
-                system_package(template, destination, data, target)
-            if destination:
-                self.status.setText("已生成：%s" % destination)
+                self.preferences.remember_file("output", destination)
                 start = "打开后识别键盘即开始。" if settings.auto_start else "打开后需点击开始按钮。"
-                description = start + ("完成后等待更换下一把。" if settings.burn_mode == "continuous" else
-                                       "成功退出 DFU 后倒计时 5 秒关闭。")
-                QMessageBox.information(self, "升级包制作完成", description + "\n\n" + destination)
+                self._pack_description = start + ("完成后等待更换下一把。" if settings.burn_mode == "continuous" else
+                                                  "成功退出 DFU 后倒计时 5 秒关闭。")
+                self._pack_controls = [(widget, widget.isEnabled()) for widget in self.findChildren(QWidget)
+                                       if isinstance(widget, (QLineEdit, QComboBox, QAbstractButton))]
+                for widget, _ in self._pack_controls:
+                    widget.setEnabled(False)
+                worker = PackagingWorker(template, destination, data, target, self)
+                self.pack_worker = worker
+                worker.progress.connect(self.packaging_progress)
+                worker.finished.connect(self.packaging_finished)
+                self.packaging_progress(0, "正在准备升级包…")
+                worker.start()
         except Exception as e:
             QMessageBox.warning(self, "升级包未生成", str(e))
 
+    def packaging_progress(self, value, message):
+        self.generate.setText("生成中 %d%%" % value)
+        self.status.setText(message)
+
+    def packaging_finished(self):
+        worker = self.pack_worker
+        if worker is None or worker.isRunning():
+            return
+        self.pack_worker = None
+        for widget, enabled in self._pack_controls:
+            widget.setEnabled(enabled)
+        self._pack_controls = []
+        self.generate.setText("生成升级程序")
+        if worker.error:
+            self.status.setText("打包失败：" + worker.error)
+            QMessageBox.warning(self, "升级包未生成", worker.error)
+        else:
+            self.status.setText("已生成 · %.2f 秒：%s" % (worker.elapsed, worker.destination))
+            QMessageBox.information(self, "升级包制作完成", self._pack_description + "\n\n" + str(worker.destination))
+        worker.deleteLater()
+
+    def closeEvent(self, event):
+        if self.pack_worker is not None:
+            self.status.setText("正在生成升级包，请等待完成后关闭")
+            event.ignore()
+        else:
+            event.accept()
+
     def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
+        if self.pack_worker is None and event.mimeData().hasUrls():
             event.acceptProposedAction()
 
     def dropEvent(self, event):
+        if self.pack_worker is not None:
+            return
         urls = event.mimeData().urls()
         if urls and urls[0].isLocalFile():
+            self.preferences.remember_file("firmware", urls[0].toLocalFile())
             self.load_firmware(urls[0].toLocalFile())
 

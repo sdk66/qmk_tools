@@ -17,13 +17,14 @@ import sys
 import tarfile
 import tempfile
 import zipfile
+from contextlib import ExitStack
 from pathlib import Path, PurePosixPath
 
 from . import __version__
 from .firmware import FirmwareError
 from .package import create_executable, decode_package
 
-RUNTIME_API = 5
+RUNTIME_API = 6
 TARGETS = {
     "windows-x64": ("Windows 7 / 10 / 11 · x64", ".exe"),
     "macos-arm64": ("macOS · Apple Silicon", ".zip"),
@@ -97,7 +98,8 @@ def create_runtime_archive(native, destination, target):
     root_name = "QMK-Firmware-Studio.app" if is_mac else "QMK-Firmware-Studio" + (".exe" if target.startswith("windows") else "")
     executable = root_name + "/Contents/MacOS/QMK-Firmware-Studio" if is_mac else root_name
     binary = native / "Contents" / "MacOS" / "QMK-Firmware-Studio" if is_mac else native
-    _check_binary(binary.read_bytes()[:65536], target)
+    with binary.open("rb") as source:
+        _check_binary(source.read(65536), target)
     entries = []
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(str(destination), "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
@@ -126,10 +128,10 @@ def create_runtime_archive(native, destination, target):
         manifest = {"format": 1, "runtime_api": RUNTIME_API, "version": __version__, "target": target,
                     "root": root_name, "executable": executable, "entries": entries}
         archive.writestr("runtime.json", json.dumps(manifest, indent=2).encode("utf-8"))
-    validate_runtime(destination)
+    return validate_runtime(destination)
 
 
-def validate_runtime(path, expected_target=None):
+def validate_runtime(path, expected_target=None, executable_destination=None, progress=None):
     try:
         with zipfile.ZipFile(path) as archive:
             infos = archive.infolist()
@@ -148,6 +150,8 @@ def validate_runtime(path, expected_target=None):
             executable = str(_safe_name(manifest["executable"]))
             expected = {"runtime.json"}
             seen = set()
+            total_bytes = max(1, sum(item["size"] for item in manifest["entries"]))
+            checked_bytes = 0
             for item in manifest["entries"]:
                 name = item["name"]
                 parts = _safe_name(name).parts
@@ -166,12 +170,20 @@ def validate_runtime(path, expected_target=None):
                 if mode != info.external_attr >> 16 or info.file_size != item["size"]:
                     raise FirmwareError("系统模板权限或文件大小不匹配。")
                 digest = hashlib.sha256()
-                with archive.open(info) as source:
+                with ExitStack() as stack:
+                    source = stack.enter_context(archive.open(info))
+                    sink = (stack.enter_context(open(executable_destination, "wb"))
+                            if executable_destination is not None and name == executable else None)
                     while True:
                         chunk = source.read(1024 * 1024)
                         if not chunk:
                             break
                         digest.update(chunk)
+                        if sink is not None:
+                            sink.write(chunk)
+                        checked_bytes += len(chunk)
+                        if progress is not None:
+                            progress(checked_bytes / total_bytes)
                 if digest.hexdigest() != item["sha256"]:
                     raise FirmwareError("系统模板完整性校验失败。")
                 if stat.S_ISLNK(mode):
@@ -185,7 +197,12 @@ def validate_runtime(path, expected_target=None):
                 raise FirmwareError("macOS 模板缺少 .app 应用。")
             if not target.startswith("macos") and (len(manifest["entries"]) != 1 or executable != root):
                 raise FirmwareError("单文件系统模板结构无效。")
-            _check_binary(archive.read("runtime/" + executable)[:65536], target)
+            if executable_destination is not None:
+                with open(executable_destination, "rb") as source:
+                    _check_binary(source.read(65536), target)
+            else:
+                with archive.open("runtime/" + executable) as source:
+                    _check_binary(source.read(65536), target)
             return manifest
     except FirmwareError:
         raise
@@ -226,8 +243,10 @@ def install_runtime(source, directory):
     return targets
 
 
-def system_package(template, destination, data, target):
+def system_package(template, destination, data, target, progress=None):
     """Assemble for the TARGET, without executing any target-system program."""
+    notify = progress or (lambda value, message: None)
+    notify(0, "正在校验固件与参数…")
     decode_package(data)
     if target not in TARGETS:
         raise FirmwareError("请选择客户系统。")
@@ -237,31 +256,57 @@ def system_package(template, destination, data, target):
     if template.resolve() == destination.resolve():
         raise FirmwareError("输出不能覆盖系统模板。")
     destination.parent.mkdir(parents=True, exist_ok=True)
+    if target == "windows-x64" and not template.name.endswith(".qmk-runtime.zip"):
+        # A native Windows template is already a self-contained EXE. Copy it
+        # and append the small firmware payload instead of ZIP-compressing the
+        # whole program and immediately extracting it again.
+        notify(15, "正在检查 Windows 运行程序…")
+        with template.open("rb") as source:
+            _check_binary(source.read(65536), target)
+        notify(40, "正在写入固件与连接参数…")
+        create_executable(template, destination, data)
+        notify(100, "升级包已生成")
+        return
     with tempfile.TemporaryDirectory(prefix="qmk-package-") as work:
         work = Path(work)
         runtime = template
+        if target == "windows-x64":
+            executable = work / "runtime.bin"
+            notify(5, "正在读取 Windows 运行模板…")
+            validate_runtime(runtime, target, executable_destination=executable,
+                             progress=lambda value: notify(5 + int(60 * value), "正在校验运行模板…"))
+            notify(75, "正在写入固件与连接参数…")
+            create_executable(executable, destination, data)
+            notify(100, "升级包已生成")
+            return
         if not template.name.endswith(".qmk-runtime.zip"):
             runtime = work / "native.qmk-runtime.zip"
-            create_runtime_archive(template, runtime, target)
-        meta = validate_runtime(runtime, target)
+            notify(5, "正在准备运行模板…")
+            meta = create_runtime_archive(template, runtime, target)
+        else:
+            notify(5, "正在校验运行模板…")
+            meta = validate_runtime(runtime, target,
+                                    progress=lambda value: notify(5 + int(35 * value), "正在校验运行模板…"))
         staged = work / ("output" + TARGETS[target][1])
         with zipfile.ZipFile(str(runtime)) as archive:
             if target.startswith("macos"):
                 stem = destination.name[:-4] if destination.name.lower().endswith(".zip") else destination.stem
                 _safe_name(stem)
                 with zipfile.ZipFile(str(staged), "w", zipfile.ZIP_DEFLATED, compresslevel=6) as out:
-                    for entry in meta["entries"]:
+                    for index, entry in enumerate(meta["entries"]):
                         name = entry["name"]
                         # Rename only the outer app directory, leaving its
                         # Info.plist, signatures and frameworks byte-identical.
                         output_name = stem + "/" + stem + ".app" + name[len(meta["root"]):]
                         out.writestr(_zip_info(output_name, entry["mode"]), archive.read("runtime/" + name))
+                        notify(40 + int(50 * (index + 1) / max(1, len(meta["entries"]))), "正在生成 macOS 升级包…")
                     out.writestr(_zip_info(stem + "/" + PAYLOAD_NAME, stat.S_IFREG | 0o644), data)
             else:
                 executable = work / "runtime.bin"
                 executable.write_bytes(archive.read("runtime/" + meta["executable"]))
                 os.chmod(str(executable), 0o755)
                 upgraded = work / "updater.bin"
+                notify(50, "正在写入固件与连接参数…")
                 create_executable(executable, upgraded, data)
                 if target == "windows-x64":
                     shutil.copyfile(str(upgraded), str(staged))
@@ -269,6 +314,7 @@ def system_package(template, destination, data, target):
                     stem = destination.name[:-7] if destination.name.endswith(".tar.gz") else destination.stem
                     _safe_name(stem)
                     with tarfile.open(str(staged), "w:gz") as out:
+                        notify(70, "正在生成 Linux 升级包…")
                         info = tarfile.TarInfo(stem + "/" + stem)
                         info.size = upgraded.stat().st_size
                         info.mode = 0o755
@@ -277,8 +323,10 @@ def system_package(template, destination, data, target):
         fd, temp = tempfile.mkstemp(prefix=".qmk-output-", dir=str(destination.parent))
         os.close(fd)
         try:
+            notify(95, "正在保存升级包…")
             shutil.copyfile(str(staged), temp)
             os.replace(temp, destination)
+            notify(100, "升级包已生成")
         finally:
             if os.path.exists(temp):
                 os.unlink(temp)
