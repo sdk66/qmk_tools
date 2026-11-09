@@ -161,3 +161,12 @@ class RuntimeTests(unittest.TestCase):
                     out.writestr(info, data)
             with self.assertRaises(FirmwareError):
                 validate_runtime(io.BytesIO(stream.getvalue()))
+
+    def test_linux_usb_backend_uses_system_library_if_wheel_loader_fails(self):
+        from qmk_updater.devices import usb_backend
+        marker = object()
+        with patch("qmk_updater.devices.sys.platform", "linux"), \
+             patch("usb.backend.libusb1.get_backend", side_effect=[None, marker]) as backend:
+            self.assertIs(usb_backend(), marker)
+            self.assertEqual(backend.call_count, 2)
+            self.assertEqual(backend.call_args_list[-1].kwargs, {})

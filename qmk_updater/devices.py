@@ -8,6 +8,9 @@ def usb_backend():
     import usb.backend.libusb1
     import libusb_package
     backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
+    if backend is None and sys.platform.startswith("linux"):
+        # Linux distributions can provide libusb independently of the wheel.
+        backend = usb.backend.libusb1.get_backend()
     if backend is None:
         raise UpgradeError("USB 后端无法加载，请使用完整的官方升级包。")
     return backend

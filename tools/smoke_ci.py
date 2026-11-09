@@ -30,5 +30,9 @@ else:
     executable = release / (name + ".exe")
 env = os.environ.copy()
 env["QT_QPA_PLATFORM"] = "offscreen"
+env["PYUSB_DEBUG"] = "debug"
+if target.startswith("linux"):
+    subprocess.check_call([sys.executable, str(ROOT / "main.py"), "--diagnostics",
+                           str(work / "source-diagnostics.json")], env=env)
 subprocess.check_call([sys.executable, str(ROOT / "tools" / "smoke_test.py"), str(executable),
                        "--output", str(work / "results")], env=env)
