@@ -4,7 +4,7 @@
 
 输出名称默认来自所选 HEX/BIN 的文件名并加 `_update`，例如 `mk20b_via_v9.hex` → `mk20b_via_v9_update.exe`。名称可单独编辑，不随设备名称、版本或烧录模式变化。匹配、进 Boot 和 Flash 预检查阶段均保持 0%，仅在页面写入和校验后增加百分比。退出 DFU 只发送一次命令，完成日志合并为一次结果。
 
-制作工具左上角显示 **v1.0.0**。右上角「界面背景」提供深色、粉色、黄色、蓝色、绿色、青色、紫色、白色，默认蓝色，发布预览同步配色。客户升级页背景使用发布设置中的独立选项，保持默认白色。显示版本与内部运行模板兼容版本分离；本轮内部版本为 **1.6.0 / Runtime API 6**。
+制作工具文件名按实际版本生成：**QMK_Firmware_Toolbox_Package_1.6.0.exe**。窗口标题、软件信息及 Windows 文件属性中的版本统一为 **1.6.0**，均来自同一个版本定义；后续构建随版本自动更新。运行模板兼容级别为 **Runtime API 6**。右上角「界面背景」提供深色、粉色、黄色、蓝色、绿色、青色、紫色、白色，默认蓝色，发布预览同步配色。客户升级页背景使用发布设置中的独立选项，保持默认白色。
 
 勾选「打开后自动开始」时，客户双击后识别键盘即升级；取消勾选时，连接键盘后需点击开始按钮。单次与工厂连续烧录均可使用。
 
@@ -14,7 +14,7 @@
 
 ## 现在可以使用的文件
 
-- `release/windows-x64/QMK-Firmware-Studio.exe`：Windows 制作端，也可以作为原生升级运行模板。
+- `release/windows-x64/QMK_Firmware_Toolbox_Package_1.6.0.exe`：Windows 制作端，也可以作为原生升级运行模板。
 - `release/windows-x64/mk20b_via_v9_update.exe`：单次客户包。双击后自动识别升级，成功并确认重连后，倒计时 5 秒关闭。
 - `release/windows-x64/factory/mk20b_via_v9_update.exe`：工厂连续烧录包。与单次示例分目录保存，成功后等待更换下一把，显示成功/失败计数，支持暂停。
 - `examples/SAMURAI-S751-v0.0.9.qmk`：通用固件数据包，含固件段、参数及 SHA-256。
@@ -24,7 +24,7 @@
 - `release/linux-x64/mk20b_via_v9_update.tar.gz`：在 Windows 装包的 Linux 示例升级包。
 - `maker-preview.png`、`updater-preview.png`、`factory-preview.png`：实际 Qt 界面截图。
 
-**验证范围：** 本轮 1.6.0 / API 6 的四系统运行模板已在各自原生 GitHub runner 构建，通过 157 项自动化测试、冻结程序启动和安全预览检查；Mac 解压后的应用另通过 `codesign --verify --deep --strict`。详见 [最终 GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42583485189) 和 [VALIDATION.md](VALIDATION.md)。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7 真机运行。Mac 正式对外分发仍需要厂家的 Developer ID 签名和公证。
+**验证范围：** 此前 1.6.0 / API 6 的打包优化构建已在四系统各自原生 GitHub runner 通过 157 项自动化测试、冻结程序启动和安全预览检查；Mac 解压后的应用另通过 `codesign --verify --deep --strict`。详见 [打包优化 GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42583485189) 和 [VALIDATION.md](VALIDATION.md)。本轮文件名与版本统一后的构建验证另记于验证记录。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7 真机运行。Mac 正式对外分发仍需要厂家的 Developer ID 签名和公证。
 
 ## 制作升级包
 
@@ -50,7 +50,7 @@
 
 Mac 包保留模板 `.app` 内所有文件字节和框架符号链接，把固件与设置放在应用旁的隐藏 `.qmk-update` 中。因此 Windows 装包不调用 `codesign`，不修改已签名 `.app` 的资源。客户需保留整个解压文件夹，不能只把 `.app` 单独移走。隐藏固件包仍使用本项目的 SHA-256 完整性校验。
 
-**制作工具标题保持 v1.0.0，本轮运行模板需要 1.6.0 / API 6。** 使用新模板重新生成客户包，已有客户 EXE 不会自动获得本轮 USB 连接处理改进。本轮原生构建与成品启动验证见 [最终 GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42583485189)，源提交 `2a310ac`；详细结果见 [VALIDATION.md](VALIDATION.md)。源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
+**制作工具文件名、标题及文件属性使用同一实际版本 1.6.0，运行模板需要 1.6.0 / API 6。** 使用配套新模板重新生成客户包，已有客户 EXE 不会自动更新。此前打包优化的原生构建与成品启动验证见 [GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42583485189)，源提交 `2a310ac`；本轮命名及版本一致性验证见 [VALIDATION.md](VALIDATION.md)。源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
 
 ## 单次与连续烧录
 
@@ -154,7 +154,7 @@ sudo apt-get install libegl1 libopengl0 libxcb-cursor0 libxcb-icccm4 libxcb-keys
 
 `.github/workflows/build.yml` 包含 Windows x64、macOS Intel/ARM64、Linux x64 四个原生构建任务。每个任务导出运行模板并制作示例客户包，再验证冻结程序启动；最后汇总成 `QMK-All-System-Templates.zip`，供 Windows 工具一次性导入。下载 GitHub artifact 后，如外面还有一层 ZIP，先解压取得这个模板集合文件。推送构建分支会自动重新构建，工作流合入默认分支后也可手动触发。
 
-每次 `tools/build.py` 构建都会在 `release/` 导出对应 `.qmk-runtime.zip`。本轮模板需为 **1.6.0 / Runtime API 6**，包含 APP/手动 DFU 双路径、切换竞态处理、自动入口失败后的持续等待及 Boot 接口就绪等待。旧 API 5 模板需要重新构建或导入新版。制作工具标题仍显示 v1.0.0。导入后的目录位于制作工具旁：
+每次 `tools/build.py` 构建都会在 `release/` 导出对应 `.qmk-runtime.zip`。本轮模板需为 **1.6.0 / Runtime API 6**，包含 APP/手动 DFU 双路径、切换竞态处理、自动入口失败后的持续等待及 Boot 接口就绪等待。旧 API 5 模板需要重新构建或导入新版。制作工具标题与实际版本一致，当前显示 v1.6.0。导入后的目录位于制作工具旁：
 
 ```text
 templates/
@@ -172,9 +172,9 @@ Windows/Linux 从模板复制可执行文件并嵌入包数据；Mac 从模板�
 
 ```powershell
 python tools/make_package.py --firmware mk20b_via_v9.hex --output examples/SAMURAI-S751-v0.0.9.qmk
-python tools/make_package.py --firmware mk20b_via_v9.hex --template dist/QMK-Firmware-Studio.exe --output SAMURAI-S751-v0.0.9.exe
-python tools/make_package.py --firmware mk20b_via_v9.hex --mode continuous --template dist/QMK-Firmware-Studio.exe --output SAMURAI-S751-v0.0.9-factory.exe
-python tools/make_package.py --firmware mk20b_via_v9.hex --manual-start --template dist/QMK-Firmware-Studio.exe --output SAMURAI-S751-manual.exe
+python tools/make_package.py --firmware mk20b_via_v9.hex --template dist/QMK_Firmware_Toolbox_Package_1.6.0.exe --output SAMURAI-S751-v0.0.9.exe
+python tools/make_package.py --firmware mk20b_via_v9.hex --mode continuous --template dist/QMK_Firmware_Toolbox_Package_1.6.0.exe --output SAMURAI-S751-v0.0.9-factory.exe
+python tools/make_package.py --firmware mk20b_via_v9.hex --manual-start --template dist/QMK_Firmware_Toolbox_Package_1.6.0.exe --output SAMURAI-S751-manual.exe
 python tools/make_package.py --firmware mk20b_via_v9.hex --runtime templates/macos-arm64.qmk-runtime.zip --output SAMURAI-S751-mac.zip
 python tools/make_package.py --firmware mk20b_via_v9.hex --background "#11151C" --output examples/dark.qmk
 python main.py --inspect examples/SAMURAI-S751-v0.0.9.qmk

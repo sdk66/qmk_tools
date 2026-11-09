@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from qmk_updater import __version__, WINDOWS_MAKER_STEM, WINDOWS_MAKER_FILENAME
 
 
 def main():
@@ -45,8 +47,9 @@ def main():
     libusb_license = ROOT / "licenses" / "libusb-COPYING.txt"
     if libusb_license.exists():
         shutil.copy2(str(libusb_license), str(licenses / "libusb-LGPL-2.1.txt"))
+    build_name = WINDOWS_MAKER_STEM if sys.platform == "win32" else "QMK-Firmware-Studio"
     options = ["--windowed",
-               "--name", "QMK-Firmware-Studio", "--collect-binaries", "libusb_package",
+               "--name", build_name, "--collect-binaries", "libusb_package",
                "--collect-data", "libusb_package", "--hidden-import", "usb.backend.libusb1",
                "--hidden-import", "hid", "--exclude-module", "PyQt5", "--exclude-module", "PyQt6",
                "--add-data", str(ROOT / "icon.png") + os.pathsep + ".",
@@ -62,6 +65,11 @@ def main():
     else:
         options.append("--onefile")
     icon = ROOT / "assets" / "app.ico"
+    if sys.platform == "win32":
+        from tools.windows_version import windows_version_resource
+        version_file = assets / "windows-version.txt"
+        version_file.write_text(windows_version_resource(__version__, WINDOWS_MAKER_FILENAME), encoding="utf-8")
+        options.extend(["--version-file", str(version_file)])
     if sys.platform == "win32" and icon.exists():
         options.extend(["--icon", str(icon)])
     mac_icon = ROOT / "assets" / "app.icns"
@@ -78,7 +86,7 @@ def main():
                                "--specpath", str(assets)] + options + [str(ROOT / "main.py")])
         sys.path.insert(0, str(ROOT))
         from tools.build_filters import add_windows_filter
-        spec = assets / "QMK-Firmware-Studio.spec"
+        spec = assets / (build_name + ".spec")
         spec.write_text(add_windows_filter(spec.read_text(encoding="utf-8"), ROOT), encoding="utf-8")
         command.append(str(spec))
     else:
@@ -91,7 +99,7 @@ def main():
               ("macos-arm64" if platform.machine() == "arm64" else "macos-x64") if sys.platform == "darwin" else "linux-x64")
     release = ROOT / "release" / target
     release.mkdir(parents=True, exist_ok=True)
-    name = "QMK-Firmware-Studio" + (".exe" if sys.platform == "win32" else ".app" if sys.platform == "darwin" else "")
+    name = WINDOWS_MAKER_FILENAME if sys.platform == "win32" else "QMK-Firmware-Studio" + (".app" if sys.platform == "darwin" else "")
     built = distpath / name
     sys.path.insert(0, str(ROOT))
     from qmk_updater.runtimes import create_runtime_archive

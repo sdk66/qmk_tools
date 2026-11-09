@@ -41,12 +41,14 @@ def main():
                           "size": p.firmware.size, "segments": len(p.firmware.segments)}, ensure_ascii=True, indent=2))
         return 0
     from qmk_updater.qt import QApplication, QTimer, Qt
+    from qmk_updater import __version__
     if hasattr(Qt, "AA_EnableHighDpiScaling"):
         QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     if hasattr(Qt, "AA_UseHighDpiPixmaps"):
         QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
     app = QApplication(sys.argv[:1])
-    app.setApplicationName("QMK Firmware Studio")
+    app.setApplicationName("QMK Firmware Toolbox Package")
+    app.setApplicationVersion(__version__)
     app.setOrganizationName("QMK-Firmware-Studio")
     from qmk_updater.ui import MakerWindow
     from qmk_updater.updater_window import UpdaterWindow

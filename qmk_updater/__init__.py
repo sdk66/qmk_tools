@@ -2,5 +2,6 @@
 
 __version__ = "1.6.0"
 
-# Public maker title is independent of the runtime/template compatibility API.
-MAKER_DISPLAY_VERSION = "1.0.0"
+# One release version drives the UI, Windows filename and file properties.
+WINDOWS_MAKER_STEM = "QMK_Firmware_Toolbox_Package_" + __version__
+WINDOWS_MAKER_FILENAME = WINDOWS_MAKER_STEM + ".exe"

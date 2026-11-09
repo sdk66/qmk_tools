@@ -10,7 +10,7 @@ import zipfile
 from dataclasses import asdict, fields
 from pathlib import Path
 
-from . import __version__
+from . import __version__, WINDOWS_MAKER_FILENAME
 from .devices import Hardware
 from .firmware import load_firmware, FirmwareError, FLASH_BASE
 from .package import (Settings, Package, encode_package, decode_package,
@@ -76,7 +76,7 @@ def show_licenses(parent):
     dialog.resize(760, 560)
     box = QVBoxLayout(dialog)
     box.setContentsMargins(20, 20, 20, 20)
-    box.addWidget(label("QMK Firmware Studio  " + __version__, "cardTitle"))
+    box.addWidget(label("QMK Firmware Toolbox Package  " + __version__, "cardTitle"))
     picker = QComboBox()
     text = QTextEdit()
     text.setReadOnly(True)
@@ -611,7 +611,7 @@ class MakerWindow(QMainWindow):
             exe = Path(sys.executable)
             return exe.parent.parent.parent if sys.platform == "darwin" and exe.parent.name == "MacOS" else exe
         extension = ".exe" if target.startswith("windows") else ".app" if target.startswith("macos") else ""
-        local = ROOT / "dist" / ("QMK-Firmware-Studio" + extension)
+        local = ROOT / "dist" / (WINDOWS_MAKER_FILENAME if target == "windows-x64" else "QMK-Firmware-Studio" + extension)
         if target == host_target() and local.exists():
             return local
         raise FirmwareError("请先导入 %s 系统模板；导入后可在当前电脑生成对应升级包。" % TARGETS[target][0])

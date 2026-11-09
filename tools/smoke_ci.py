@@ -7,6 +7,8 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from qmk_updater import __version__, WINDOWS_MAKER_FILENAME
 parser = argparse.ArgumentParser()
 parser.add_argument("--target", required=True)
 args = parser.parse_args()
@@ -28,6 +30,15 @@ elif target.startswith("linux"):
     executable.chmod(0o755)
 else:
     executable = release / (name + ".exe")
+    # Check the compiled file properties, not only the resource source text.
+    import pefile
+    with pefile.PE(str(release / WINDOWS_MAKER_FILENAME)) as image:
+        strings = {key.decode("utf-8"): value.decode("utf-8")
+                   for group in image.FileInfo for section in group
+                   for table in getattr(section, "StringTable", ())
+                   for key, value in table.entries.items()}
+        assert strings["FileVersion"] == strings["ProductVersion"] == __version__
+        assert strings["OriginalFilename"] == WINDOWS_MAKER_FILENAME
 env = os.environ.copy()
 env["QT_QPA_PLATFORM"] = "offscreen"
 env["PYUSB_DEBUG"] = "debug"

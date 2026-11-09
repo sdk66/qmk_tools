@@ -1,5 +1,5 @@
 """Small, packaging-only maker window. Protocol overrides live in a dialog."""
-from . import MAKER_DISPLAY_VERSION
+from . import __version__
 from .qt import *
 from .ui import ROOT, label, button, form_field, show_licenses
 from .layouts import Panel, compact_field, apply_compact_theme
@@ -9,7 +9,7 @@ from .maker_theme import THEMES, ColorSwatch
 
 
 def build_maker_window(window):
-    window.setWindowTitle("QMK 升级包制作  v" + MAKER_DISPLAY_VERSION)
+    window.setWindowTitle("QMK 升级包制作  v" + __version__)
     window.setWindowIcon(QIcon(str(ROOT / "icon.png")))
     window.resize(960, 610)
     window.setMinimumSize(920, 580)

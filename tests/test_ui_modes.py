@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from qmk_updater.qt import QApplication
+from qmk_updater import __version__
 from qmk_updater.ui import MakerWindow
 from qmk_updater.updater_window import UpdaterWindow
 from qmk_updater.package import Settings, Package, encode_package, decode_package
@@ -298,7 +299,7 @@ class UiModeTests(unittest.TestCase):
     def test_maker_title_and_blue_default_theme(self):
         window = MakerWindow()
         self.windows.append(window)
-        self.assertTrue(window.windowTitle().endswith("v1.0.0"))
+        self.assertTrue(window.windowTitle().endswith("v" + __version__))
         self.assertEqual(window.maker_theme, "blue")
         self.assertTrue(window.theme_buttons["blue"].isChecked())
         self.assertEqual(sum(button.isChecked() for button in window.theme_buttons.values()), 1)
