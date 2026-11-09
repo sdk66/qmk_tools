@@ -46,7 +46,7 @@
 
 Mac 包保留模板 `.app` 内所有文件字节和框架符号链接，把固件与设置放在应用旁的隐藏 `.qmk-update` 中。因此 Windows 装包不调用 `codesign`，不修改已签名 `.app` 的资源。客户需保留整个解压文件夹，不能只把 `.app` 单独移走。隐藏固件包仍使用本项目的 SHA-256 完整性校验。
 
-**当前交付已经包含四系统真实 1.4.0 运行模板。** 最终构建与成品启动验证见 [GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42562177917)，源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
+**当前交付包含四系统真实运行模板，制作工具标题显示 v1.0.0。** 最终构建与成品启动验证见 [GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42572980314)，源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。内部运行模板兼容版本保持 1.4.0 / API 4。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
 
 ## 单次与连续烧录
 
