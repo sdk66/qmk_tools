@@ -9,13 +9,13 @@
 ## 现在可以使用的文件
 
 - `release/windows-x64/QMK-Firmware-Studio.exe`：Windows 制作端，也可以作为原生升级运行模板。
-- `release/windows-x64/SAMURAI-S751-v0.0.9.exe`：单次客户包，内置 `mk20b_via_v9.hex`。双击后自动识别升级，成功退出 DFU 并确认重连后，倒计时 5 秒关闭。
-- `release/windows-x64/SAMURAI-S751-v0.0.9-factory.exe`：工厂连续烧录包。成功后保持窗口打开，等待拔下本把并连接下一把，显示成功/失败计数，支持暂停。
+- `release/windows-x64/mk20b_via_v9.exe`：单次客户包，默认文件名来自固件。双击后自动识别升级，成功并确认重连后，倒计时 5 秒关闭。
+- `release/windows-x64/factory/mk20b_via_v9.exe`：工厂连续烧录包。与单次示例分目录保存，成功后等待更换下一把，显示成功/失败计数，支持暂停。
 - `examples/SAMURAI-S751-v0.0.9.qmk`：通用固件数据包，含固件段、参数及 SHA-256。
 - `release/windows-x64.qmk-runtime.zip`：本次 Windows 构建导出的可导入运行模板。
 - `release/QMK-All-System-Templates.zip`：已完成原生构建、启动检查的四系统运行模板集合。
-- `release/macos-arm64/SAMURAI-S751-v0.0.9.zip`、`release/macos-x64/SAMURAI-S751-v0.0.9.zip`：在 Windows 装包的真实 Mac 示例升级包。
-- `release/linux-x64/SAMURAI-S751-v0.0.9.tar.gz`：在 Windows 装包的 Linux 示例升级包。
+- `release/macos-arm64/mk20b_via_v9.zip`、`release/macos-x64/mk20b_via_v9.zip`：在 Windows 装包的真实 Mac 示例升级包。
+- `release/linux-x64/mk20b_via_v9.tar.gz`：在 Windows 装包的 Linux 示例升级包。
 - `maker-preview.png`、`updater-preview.png`、`factory-preview.png`：实际 Qt 界面截图。
 
 **验证范围：** 四系统运行模板已在各自原生 GitHub runner 构建，通过自动化测试、冻结程序启动和安全预览检查；Mac 解压后的应用另通过 `codesign --verify --deep --strict`。Windows 工具已装入四平台模板，可直接选择目标系统。没有对实物键盘发送进 Boot / 擦除 / 写入命令，也没有在 Windows 7 真机运行。Mac 正式对外分发仍需要厂家的 Developer ID 签名和公证。
@@ -26,7 +26,7 @@
 2. USB 和 Raw HID 描述符只有一组时自动填入；多组时在「高级参数」中选择。未识别到的项目允许手动配置，但生成前会提示确认。
 3. 确认 APP 的 VID、PID、Usage Page、Usage ID。这些是**客户当前旧固件**的参数，可以与新固件不同。默认值来自新固件，旧固件不同则必须修改。
 4. Boot 默认 `342D:DFA0`，Raw HID 默认 32 字节、Report ID `00`。Boot 标识、报告参数、APP/BIN 地址和 Boot 恢复选项统一收在「高级参数」中。`0x0B` 固定为 VIA Boot 跳转命令。
-5. 编辑设备名称、版本，明确选择客户系统、单次/连续模式、「打开后自动开始」及升级页背景。右侧预览同步显示客户界面，再点击「生成升级包」。
+5. 编辑设备名称、版本及独立的「升级包文件名」，选择客户系统、单次/连续模式、「打开后自动开始」及升级页背景，再点击「生成升级包」。文件名初始值取 HEX/BIN 去掉扩展名的部分；系统后缀自动补齐。右侧发布预览使用与制作页相同的深色面板，只显示实际输出名称、系统、模式及启动方式。
 
 ## Windows 上生成 Mac / Linux 升级包
 
@@ -44,7 +44,7 @@
 
 Mac 包保留模板 `.app` 内所有文件字节和框架符号链接，把固件与设置放在应用旁的隐藏 `.qmk-update` 中。因此 Windows 装包不调用 `codesign`，不修改已签名 `.app` 的资源。客户需保留整个解压文件夹，不能只把 `.app` 单独移走。隐藏固件包仍使用本项目的 SHA-256 完整性校验。
 
-**当前交付已经包含四系统真实运行模板。** 最终构建与成品启动验证见 [GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42559054059)，源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
+**当前交付已经包含四系统真实 1.4.0 运行模板。** 最终构建与成品启动验证见 [GitHub Actions](https://github.com/sdk66/qmk_tools/actions/runs/42562177917)，源代码位于 `codex/runtime-templates` 分支，`main` 没有改动。单元测试中的架构测试样本仅用于异常测试，不会作为真实模板交付。
 
 ## 单次与连续烧录
 
@@ -104,6 +104,8 @@ macOS 运行模板应在首次构建时完成所需的厂家签名和公证。Py
 - HEX 稀疏段保留空洞，不把空洞填成 `FF` 后擦除。先读完所有涉及页面，再逐页保留未覆盖字节、擦除、写入、读回比较；不执行整片擦除。
 - 读保护时停止，不自动解除保护或写入芯片信息区域。
 - 校验失败保留 Boot；全部校验通过才发复位命令。
+- 匹配、进 Boot、芯片检查和页预读保持 0%；页面写入并校验后才开始增加。每次尝试只发送一条退出 DFU 的 `0x83` 命令，重连等待和关闭窗口不重复发送。
+- 进 Boot 的 `0x0B` 与写完后的退出是两个不同阶段。完成日志只保留一次成功结果，避免多条确认文字被误认为再次退出。
 - 未观察到新固件 HID 返回时显示「写入完成，等待重新连接」，不会显示完整升级成功。
 - 进程锁防止同一用户同时启动多个升级任务；升级时阻止正常关闭窗口，支持导出日志。
 - 单次和连续模式均尊重「打开后自动开始」设置。取消时先等待点击开始，再允许发送进 Boot 或烧录命令。预览和截图模式始终禁用设备通信；制作工具本身不会发送升级命令。
