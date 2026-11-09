@@ -20,6 +20,8 @@ class UpdaterWindow(QMainWindow):
         self._closing = False
         self._probe_close_connected = False
         self._last_log_bucket = None
+        self._last_log_phase = None
+        self._handled_worker = None
         self._last_probe_error = ""
         self.log_lines = deque(maxlen=50000)
         from .layouts import build_updater
@@ -123,6 +125,8 @@ class UpdaterWindow(QMainWindow):
         self.busy = True
         self.timer.stop()
         self._last_log_bucket = None
+        self._last_log_phase = None
+        self._handled_worker = None
         self.progress_bar.setValue(0)
         self.message.setText("正在检查设备并进入 Boot…")
         self.note.setText("正在烧录，请勿断电、拔出 USB 或关闭程序。")
@@ -134,22 +138,33 @@ class UpdaterWindow(QMainWindow):
             self.worker.deleteLater()
         self.worker = UpgradeWorker(self.package, self)
         self.worker.progress.connect(self.update_progress)
-        self.worker.finished.connect(self.upgrade_finished)
+        worker = self.worker
+        worker.finished.connect(lambda: self.upgrade_finished(worker))
         self.worker.start()
 
     def update_progress(self, value, text):
         self.progress_bar.setValue(value)
         self.message.setText(text)
         bucket = value // 10
-        if value < 12 or value >= 94 or bucket != self._last_log_bucket:
+        phase = text.split("·", 1)[0].strip()
+        if value == 100:
+            # The result handler records one completion line after the worker
+            # has stopped. Do not make a second completion/DFU-exit log here.
+            return
+        if phase != self._last_log_phase or value >= 94 or (value > 0 and bucket != self._last_log_bucket):
             self.append_log(text)
             self._last_log_bucket = bucket
+            self._last_log_phase = phase
 
-    def upgrade_finished(self):
-        if self.worker.isRunning():
-            QTimer.singleShot(30, self.upgrade_finished)
+    def upgrade_finished(self, worker=None):
+        worker = worker or self.worker
+        if worker is not self.worker or worker is self._handled_worker:
             return
-        self.show_outcome(self.worker.outcome, self.worker.error)
+        if worker.isRunning():
+            QTimer.singleShot(30, lambda: self.upgrade_finished(worker))
+            return
+        self._handled_worker = worker
+        self.show_outcome(worker.outcome, worker.error)
 
     def show_outcome(self, outcome=None, error=""):
         self.busy = False
@@ -163,7 +178,7 @@ class UpdaterWindow(QMainWindow):
             self.note.setText("不会自动关闭或重复烧录。可检查后重试，或拔下本把并更换下一把。")
             self.append_log("烧录失败：" + error)
             self.log.show()
-            self.log_toggle.setText("收起升级日志")
+            self.log_toggle.setText("收起日志")
         elif not outcome or not outcome.reconnected:
             self.message.setText("写入和校验完成，尚未确认退出 DFU 后的连接")
             self.connection.setText(outcome.message if outcome else "未收到完整的升级结果。")
@@ -171,9 +186,9 @@ class UpdaterWindow(QMainWindow):
             self.append_log(self.connection.text())
         else:
             self.progress_bar.setValue(100)
-            self.message.setText("烧录成功 · 已退出 DFU 并重新连接")
+            self.message.setText("升级完成，键盘已重新连接")
             self.connection.setText(outcome.message)
-            self.append_log("烧录成功，读回校验通过，设备已退出 DFU 并重新连接。")
+            self.append_log("升级成功，读回校验通过，键盘已重新连接。")
             if self.session.continuous:
                 self.note.setText("请拔下已完成的键盘，等待提示后连接下一把。程序将继续自动烧录。")
             else:
@@ -193,7 +208,7 @@ class UpdaterWindow(QMainWindow):
             self.countdown_timer.stop()
             self.close()
         else:
-            self.note.setText("升级成功，键盘已退出 DFU。%d 秒后自动关闭程序。" % remaining)
+            self.note.setText("升级成功，%d 秒后自动关闭程序。" % remaining)
             self.start_button.setText("升级完成 · %d 秒后自动关闭" % remaining)
 
     def refresh_action(self):
@@ -243,7 +258,7 @@ class UpdaterWindow(QMainWindow):
     def toggle_log(self):
         show = self.log.isHidden()
         self.log.setVisible(show)
-        self.log_toggle.setText("收起升级日志" if show else "查看升级日志")
+        self.log_toggle.setText("收起日志" if show else "查看日志")
 
     def closeEvent(self, event):
         if self.busy or (self.worker and self.worker.isRunning()):

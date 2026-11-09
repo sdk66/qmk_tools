@@ -83,12 +83,11 @@ class UiModeTests(unittest.TestCase):
         self.assertEqual(result.settings.burn_mode, "continuous")
         self.assertFalse(result.settings.auto_start)
 
-    def test_percentage_progress_is_visible_and_logs_can_be_expanded(self):
+    def test_percentage_and_logs_are_visible_in_compact_customer_page(self):
         window = self.updater()
-        self.assertFalse(window.log.isVisible())
-        window.log_toggle.click()
         self.assertTrue(window.log.isVisible())
         self.assertTrue(window.progress_bar.isTextVisible())
+        self.assertEqual(window.progress_bar.value(), 0)
         window.update_progress(47, "writing page")
         self.assertEqual(window.progress_bar.value(), 47)
         self.assertEqual(window.message.text(), "writing page")
@@ -98,13 +97,15 @@ class UiModeTests(unittest.TestCase):
         self.windows.append(window)
         window.load_firmware(Path(__file__).resolve().parent.parent / "mk20b_via_v9.hex")
         maker_style = window.styleSheet()
+        preview_style = window.customer_preview.styleSheet()
         self.assertEqual(window.settings().background, "#FFFFFF")
         self.assertNotIn("本机", " ".join(window.platform_combo.itemText(i) for i in range(window.platform_combo.count())))
         window.background_combo.setCurrentIndex(window.background_combo.findData("#11151C"))
         result = decode_package(encode_package(Package(window.settings(), window.firmware)))
         self.assertEqual(result.settings.background, "#11151C")
         self.assertEqual(window.styleSheet(), maker_style)
-        self.assertIn("#11151C", window.customer_preview.styleSheet())
+        self.assertEqual(window.customer_preview.styleSheet(), preview_style)
+        self.assertIn("深色", window.customer_preview.background_label.text())
 
     def test_maker_generates_selected_mac_package_using_imported_runtime(self):
         from qmk_updater.runtimes import create_runtime_archive, PAYLOAD_NAME
@@ -194,6 +195,9 @@ class UiModeTests(unittest.TestCase):
             self.wait_until(lambda: window.session.state == "countdown")
             self.assertEqual(hardware.jumps, 1)
             self.assertTrue(hardware.transport.reset_called)
+            self.assertEqual(len([c for c in hardware.transport.commands if c and c[0] == 0x83]), 1)
+            self.assertEqual(sum("正在退出 DFU" in line for line in window.log_lines), 1)
+            self.assertEqual(sum("升级成功，读回校验通过" in line for line in window.log_lines), 1)
             self.assertEqual(window.progress_bar.value(), 100)
             self.assertTrue(window.countdown_timer.isActive())
 
@@ -232,6 +236,51 @@ class UiModeTests(unittest.TestCase):
             self.wait_until(lambda: window.session.state == "countdown")
             self.assertEqual(hardware.jumps, 1)
             self.assertTrue(hardware.transport.reset_called)
+
+    def test_preflight_zero_percent_status_is_throttled_and_completion_logged_once(self):
+        window = self.updater()
+        for page in range(1, 30):
+            window.update_progress(0, "检查 Flash · %d / 30 页" % page)
+        self.assertEqual(window.progress_bar.value(), 0)
+        self.assertEqual(sum("检查 Flash" in line for line in window.log_lines), 1)
+        window.update_progress(95, "全部页面校验通过，正在退出 DFU…")
+        window.update_progress(100, "升级完成，键盘已重新连接")
+        window.show_outcome(Outcome(True, "done"))
+        self.assertEqual(sum("正在退出 DFU" in line for line in window.log_lines), 1)
+        self.assertEqual(sum("升级成功，读回校验通过" in line for line in window.log_lines), 1)
+
+    def test_finished_worker_is_handled_once(self):
+        from types import SimpleNamespace
+        window = self.updater()
+        worker = SimpleNamespace(isRunning=lambda: False, outcome=Outcome(True, "done"), error="")
+        window.worker = worker
+        window.upgrade_finished(worker)
+        window.upgrade_finished(worker)
+        self.assertEqual(window.session.succeeded, 1)
+        self.assertEqual(sum("升级成功，读回校验通过" in line for line in window.log_lines), 1)
+
+    def test_output_default_tracks_firmware_basename_and_is_independently_editable(self):
+        window = MakerWindow()
+        self.windows.append(window)
+        source = Path(__file__).resolve().parent.parent / "mk20b_via_v9.hex"
+        window.load_firmware(source)
+        self.assertEqual(window.output_name.text(), "mk20b_via_v9")
+        self.assertEqual(window.customer_preview.filename.text(), "mk20b_via_v9.exe")
+        window.inputs["product"].setText("Different Product")
+        window.inputs["version"].setText("9.9.9")
+        window.continuous_mode.setChecked(True)
+        self.assertEqual(window.output_name.text(), "mk20b_via_v9")
+        window.output_name.setText("客户升级包.exe")
+        window.platform_combo.setCurrentIndex(window.platform_combo.findData("macos-arm64"))
+        self.assertEqual(window.customer_preview.filename.text(), "客户升级包.zip")
+        with tempfile.TemporaryDirectory() as temp:
+            binary = Path(temp) / "new_board_v2.bin"
+            binary.write_bytes(window.firmware.segments[0].data)
+            window.load_firmware(binary)
+            self.assertEqual(window.output_name.text(), "new_board_v2")
+            window.output_name.setText("Custom")
+            window.reload_bin()
+            self.assertEqual(window.output_name.text(), "Custom")
 
 
 if __name__ == "__main__":

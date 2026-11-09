@@ -19,6 +19,7 @@ from .qt import *
 from .workflow import upgrade
 from .session import Detection
 from .runtimes import TARGETS, host_target, templates_directory, install_runtime, system_package
+from .filenames import firmware_stem, package_filename
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 
@@ -402,7 +403,13 @@ class MakerWindow(QMainWindow):
         self.customer_preview.update_preview(self.inputs["product"].text(), self.inputs["version"].text(),
                                               self.firmware.size if self.firmware else 0,
                                               self.background_combo.currentData(), self.accent,
-                                              self.auto_start.isChecked(), continuous)
+                                              self.auto_start.isChecked(), continuous,
+                                              filename=package_filename(self.output_name.text(), TARGETS[self.platform_combo.currentData()][1]),
+                                              target_label=self.platform_combo.currentText(),
+                                              firmware_name=self.firmware.name if self.firmware else "等待选择固件",
+                                              app_ids=self.inputs["app_vid"].text() + " : " + self.inputs["app_pid"].text(),
+                                              boot_ids=self.inputs["boot_vid"].text() + " : " + self.inputs["boot_pid"].text(),
+                                              address=self.base.text())
         target = self.platform_combo.currentData()
         if target:
             try:
@@ -418,8 +425,11 @@ class MakerWindow(QMainWindow):
 
     def load_firmware(self, path):
         try:
+            previous_path = self.firmware_path
             firmware = load_firmware(path, int(self.base.text(), 16))
             self.firmware, self.firmware_path = firmware, Path(path).resolve()
+            if previous_path != self.firmware_path or not self.output_name.text().strip():
+                self.output_name.setText(firmware_stem(self.firmware_path))
             self.file_label.setText(str(self.firmware_path))
             self.file_label.setToolTip(str(self.firmware_path))
             self.file_meta.setText("%s 字节 · %s" % (format(firmware.size, ","), self.firmware_path.suffix[1:].upper()))
@@ -529,7 +539,7 @@ class MakerWindow(QMainWindow):
             if path:
                 content = {"settings": asdict(settings), "firmware": str(self.firmware_path or ""),
                            "bin_base": self.base.text(), "usb_index": self.usb_combo.currentIndex(),
-                           "hid_index": self.hid_combo.currentIndex()}
+                           "hid_index": self.hid_combo.currentIndex(), "output_name": self.output_name.text()}
                 Path(path).write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
                 self.status.setText("配置已保存")
         except Exception as e:
@@ -563,6 +573,8 @@ class MakerWindow(QMainWindow):
                 background_index = self.background_combo.count() - 1
             self.background_combo.setCurrentIndex(background_index)
             self.boot_recovery.setChecked(settings.allow_boot_recovery)
+            if content.get("output_name"):
+                self.output_name.setText(content["output_name"])
             self.set_accent(settings.accent)
             self.status.setText("配置已载入 · 请确认固件和设备参数")
         except Exception as e:
@@ -611,15 +623,14 @@ class MakerWindow(QMainWindow):
                     return
             data = encode_package(Package(settings, self.firmware))
             target = self.platform_combo.currentData()
-            safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", settings.product).strip(". ") or "QMK"
-            safe_version = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", settings.version).strip(". ")
-            stem = safe_name + "-" + safe_version + ("_factory" if settings.burn_mode == "continuous" else "_updater")
             template = self.template(target)
             extension = TARGETS[target][1]
-            destination, _ = QFileDialog.getSaveFileName(self, "生成 %s 升级包" % TARGETS[target][0], stem + extension)
+            suggested_name = package_filename(self.output_name.text(), extension, firmware_stem(self.firmware_path))
+            destination, _ = QFileDialog.getSaveFileName(self, "生成 %s 升级包" % TARGETS[target][0], suggested_name)
             if destination:
-                if not destination.lower().endswith(extension):
-                    destination += extension
+                destination_path = Path(destination)
+                destination = str(destination_path.with_name(package_filename(destination_path.name, extension,
+                                                                               firmware_stem(self.firmware_path))))
                 system_package(template, destination, data, target)
             if destination:
                 self.status.setText("已生成：%s" % destination)

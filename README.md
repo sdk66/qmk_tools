@@ -1,6 +1,8 @@
 # QMK Firmware Studio
 
-面向 **WB32FQ95 / QMK Raw HID** 的离线升级包制作工具。制作端为约 **960 × 610** 的紧凑窗口，包含固件、APP 参数、发布设置和右侧升级页预览。客户页采用键盘卡片布局，背景默认白色，可选浅蓝、暖白或深色，**只影响打包后的升级页，不改变制作工具背景**。进度条常显 0–100%，日志可展开。
+面向 **WB32FQ95 / QMK Raw HID** 的离线升级包制作工具。制作端包含固件、APP 参数、发布设置及深色的发布文件预览。客户页约 **650 × 550**，采用紧凑进度条和日志布局，保留“让键盘，焕然一新。”和“连接 USB 数据线，剩下的交给我们。”。背景默认白色，可选浅蓝、暖白或深色；背景选择仅改变客户升级页，制作页及发布预览保持一致的深色面板。
+
+输出名称默认来自所选 HEX/BIN 的文件名，例如 `mk20b_via_v9.hex` → `mk20b_via_v9.exe`。名称可单独编辑，不随设备名称、版本或烧录模式追加后缀。匹配、进 Boot 和 Flash 预检查阶段均保持 0%，仅在页面写入和校验后增加百分比。退出 DFU 只发送一次命令，完成日志合并为一次结果。
 
 勾选「打开后自动开始」时，客户双击后识别键盘即升级；取消勾选时，连接键盘后需点击开始按钮。单次与工厂连续烧录均可使用。
 
@@ -140,7 +142,7 @@ sudo apt-get install libegl1 libopengl0 libxcb-cursor0 libxcb-icccm4 libxcb-keys
 
 `.github/workflows/build.yml` 包含 Windows x64、macOS Intel/ARM64、Linux x64 四个原生构建任务。每个任务导出运行模板并制作示例客户包，再验证冻结程序启动；最后汇总成 `QMK-All-System-Templates.zip`，供 Windows 工具一次性导入。下载 GitHub artifact 后，如外面还有一层 ZIP，先解压取得这个模板集合文件。推送构建分支会自动重新构建，工作流合入默认分支后也可手动触发。
 
-每次 `tools/build.py` 构建都会在 `release/` 导出对应 `.qmk-runtime.zip`。模板需为 **1.3.0 / Runtime API 3**，以支持跨系统装包、背景和外部 Mac 固件包。导入后的目录位于制作工具旁：
+每次 `tools/build.py` 构建都会在 `release/` 导出对应 `.qmk-runtime.zip`。模板需为 **1.4.0 / Runtime API 4**，以使用新的 0% 起始进度、单次退出与紧凑客户界面。导入后的目录位于制作工具旁：
 
 ```text
 templates/

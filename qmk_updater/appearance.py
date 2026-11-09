@@ -10,7 +10,7 @@ def customer_colors(background):
     return {"background": background, "card": "#1B222D" if dark else "#F7F9FC",
             "text": "#EDF2FA" if dark else "#18334E", "muted": "#9EACC0" if dark else "#708299",
             "border": "#303A49" if dark else "#DFE7F0", "track": "#0C131D" if dark else "#E9EFF6",
-            "log": "#111923" if dark else "#FFFFFF"}
+            "log": "#111923" if dark else "#FFFFFF", "warning": "#D99A2B" if dark else "#A86C09"}
 
 
 def apply_customer_theme(widget, background, accent):
@@ -25,7 +25,7 @@ def apply_customer_theme(widget, background, accent):
         QLabel#eyebrow { color: ACCENT; font-size: 10px; letter-spacing: 2px; font-weight: 600; }
         QLabel#accent { color: ACCENT; }
         QLabel#badge { color: ACCENT; border: 1px solid BORDER; border-radius: 9px; padding: 4px 9px; font-size: 10px; }
-        QLabel#warning { color: MUTED; font-size: 10px; }
+        QLabel#warning { color: WARNING; font-size: 10px; }
         QFrame#card { background: CARD; border: 1px solid BORDER; border-radius: 13px; }
         QFrame#card QLabel { background: transparent; border: 0; }
         QFrame#customerPreview { border: 1px solid BORDER; border-radius: 12px; }
@@ -35,60 +35,67 @@ def apply_customer_theme(widget, background, accent):
         QPushButton#link { background: transparent; color: MUTED; border: 0; padding: 0; min-height: 23px; font-size: 11px; }
         QProgressBar { background: TRACK; color: FOREGROUND; border: 1px solid BORDER; border-radius: 5px; min-height: 21px; max-height: 21px; text-align: center; font-size: 11px; }
         QProgressBar::chunk { background: ACCENT; border-radius: 4px; }
-        QPlainTextEdit, QTextEdit { background: LOG; color: MUTED; border: 1px solid BORDER; border-radius: 7px; padding: 7px; font-size: 11px; }
+        QPlainTextEdit, QTextEdit { background: LOG; color: FOREGROUND; border: 1px solid BORDER; border-radius: 7px; padding: 7px; font-size: 11px; }
         QComboBox { background: CARD; border: 1px solid BORDER; border-radius: 5px; padding: 6px; }
     """
     for token, value in [("BACKGROUND", colors["background"]), ("FOREGROUND", colors["text"]),
                          ("MUTED", colors["muted"]), ("BORDER", colors["border"]),
-                         ("CARD", colors["card"]), ("TRACK", colors["track"]), ("LOG", colors["log"]), ("ACCENT", accent)]:
+                         ("CARD", colors["card"]), ("TRACK", colors["track"]), ("LOG", colors["log"]),
+                         ("WARNING", colors["warning"]), ("ACCENT", accent)]:
         style = style.replace(token, value)
     widget.setStyleSheet(style)
 
 
 class CustomerPreview(QFrame):
+    """Read-only release information using the maker's own panel colors."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("customerPreview")
         self.setFixedWidth(254)
         box = QVBoxLayout(self)
-        box.setContentsMargins(14, 16, 14, 16)
-        box.setSpacing(12)
-        box.addWidget(label("升级页预览", "eyebrow"))
-        title = label("让键盘，焕然一新。", "cardTitle")
-        title.setStyleSheet("font-size:18px; font-weight:700;")
-        box.addWidget(title)
-        self.product = label("选择固件后预览", "cardTitle", True)
-        card = Card()
-        card.box.setContentsMargins(12, 12, 12, 12)
-        card.box.setSpacing(8)
-        card.box.addWidget(self.product)
-        self.art = KeyboardArt()
-        self.art.setMinimumHeight(105)
-        self.art.setMaximumHeight(105)
-        card.box.addWidget(self.art)
-        self.version = label("", "muted")
-        card.box.addWidget(self.version)
-        box.addWidget(card)
-        box.addWidget(label("升级进度", "muted"))
-        progress = QProgressBar()
-        progress.setRange(0, 100)
-        progress.setValue(0)
-        progress.setFormat("%p%")
-        progress.setTextVisible(True)
-        box.addWidget(progress)
-        self.mode = label("单次烧录 · 成功后 5 秒关闭", "muted", True)
-        box.addWidget(self.mode)
-        self.action = button("等待键盘连接…", True)
-        self.action.setAttribute(Qt.WA_TransparentForMouseEvents)
-        box.addWidget(self.action)
-        box.addStretch()
-        box.addWidget(label("仅预览打包后的界面", "tiny"))
+        box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(10)
+        def panel(title):
+            card = Card(title)
+            card.box.setContentsMargins(15, 13, 15, 13)
+            card.box.setSpacing(10)
+            return card
+        release = panel("发布预览")
+        self.system = label("", "muted", True)
+        self.filename = label("等待选择固件", "hero", True)
+        self.filename.setTextFormat(Qt.PlainText)
+        self.firmware = label("", "tiny", True)
+        self.mode = label("", "muted", True)
+        self.startup = label("", "muted", True)
+        for widget in (self.system, self.filename, self.firmware, self.mode, self.startup):
+            release.box.addWidget(widget)
+        release.box.addStretch()
+        box.addWidget(release, 2)
+        flow = panel("设备连接流程")
+        flow.box.addWidget(label("当前设备 · APP", "muted"))
+        self.app_ids = label("", "monoLabel")
+        flow.box.addWidget(self.app_ids)
+        flow.box.addWidget(label("↓  自动进入 Boot，写入后重启一次", "muted", True))
+        self.boot_ids = label("", "monoLabel")
+        flow.box.addWidget(self.boot_ids)
+        box.addWidget(flow, 1)
+        info = panel("参数说明")
+        info.box.addWidget(label("APP 标识可按当前键盘修改，Boot 标识独立保存。", "muted", True))
+        self.address = label("", "muted")
+        self.background_label = label("", "muted")
+        info.box.addWidget(self.address)
+        info.box.addWidget(self.background_label)
+        info.box.addStretch()
+        box.addWidget(info, 1)
 
-    def update_preview(self, product, version, size, background, accent, auto_start, continuous):
-        self.product.setText(product or "选择固件后预览")
-        self.version.setText("v%s  ·  %.2f KiB" % (version or "—", size / 1024))
-        self.mode.setText("连续烧录 · 完成后等待下一把" if continuous else "单次烧录 · 成功后 5 秒关闭")
-        self.action.setText("等待键盘连接…" if auto_start else "一键升级  →")
-        self.art.accent = accent
-        self.art.update()
-        apply_customer_theme(self, background, accent)
+    def update_preview(self, product, version, size, background, accent, auto_start, continuous,
+                       filename="", target_label="", firmware_name="", app_ids="", boot_ids="", address=""):
+        self.system.setText(target_label + (" · 连续烧录" if continuous else " · 单次烧录"))
+        self.filename.setText(filename if size else "等待选择固件")
+        self.firmware.setText("内置固件：%s\n%s 字节" % (firmware_name, format(size, ",")) if size else "生成文件自带固件和设备参数。")
+        self.mode.setText("完成后等待更换下一把，窗口保持打开。" if continuous else "成功后显示 5 秒倒计时，随后自动关闭。")
+        self.startup.setText("打开后自动识别并开始。" if auto_start else "打开后点击开始按钮。")
+        self.app_ids.setText(app_ids)
+        self.boot_ids.setText("BOOT  " + boot_ids)
+        self.address.setText("APP 地址  0x" + address)
+        names = {value.upper(): name for name, value in BACKGROUNDS}
+        self.background_label.setText("客户页背景：" + names.get(background.upper(), background))

@@ -16,7 +16,7 @@ def upgrade(package, hardware, progress=lambda value, text: None,
     package.settings.validate()
     package.firmware.validate()
     settings = package.settings
-    progress(1, "正在匹配键盘的四项 HID 标识…")
+    progress(0, "正在匹配键盘的四项 HID 标识…")
     apps = hardware.app_devices(settings)
     boots = hardware.boot_devices(settings)
     if len(apps) > 1 or len(boots) > 1:
@@ -28,10 +28,10 @@ def upgrade(package, hardware, progress=lambda value, text: None,
             raise UpgradeError("未找到匹配的键盘。请使用 USB 有线连接，并检查 VID、PID、Usage Page、Usage ID。")
         if not settings.allow_boot_recovery:
             raise UpgradeError("键盘已在 Boot 模式，此升级包未开启恢复升级。请由厂家生成允许 Boot 恢复的包。")
-        progress(8, "恢复升级：已找到唯一的 Boot 设备")
+        progress(0, "恢复升级：已找到唯一的 Boot 设备")
         boot = boots[0]
     else:
-        progress(3, "已找到键盘，发送 0x0B 进入 Boot…")
+        progress(0, "已找到键盘，发送 0x0B 进入 Boot…")
         hardware.jump(apps[0], settings)
         deadline = clock() + timeout
         boot = None
@@ -49,12 +49,14 @@ def upgrade(package, hardware, progress=lambda value, text: None,
                 break
         if boot is None:
             raise UpgradeError("等待 Boot 超时。请确认固件收到 0x0B 后执行了跳转，并检查 Boot 的 WinUSB 驱动 / USB 权限。")
-    progress(10, "Boot 已连接，正在检查芯片…")
+    progress(0, "Boot 已连接，正在检查芯片…")
     transport = hardware.open_boot(boot)
     try:
         flasher = Wb32(transport)
         flasher.flash(package.firmware, progress)
-        progress(95, "全部页面校验通过，正在重启键盘…")
+        progress(95, "全部页面校验通过，正在退出 DFU…")
+        # This is the sole reboot command for an attempt. Closing the USB
+        # transport and waiting for APP below must never send another reset.
         flasher.reset()
     finally:
         transport.close()

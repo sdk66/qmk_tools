@@ -91,7 +91,7 @@ class Wb32:
                 address = segment.address + index
                 page_address = address & ~(PAGE_SIZE - 1)
                 pages.setdefault(page_address, {})[address - page_address] = value
-        progress(12, "已识别 WB32FQ95 · Flash 256 KiB / SRAM 36 KiB")
+        progress(0, "已识别 WB32FQ95 · Flash 256 KiB / SRAM 36 KiB")
         # Read every affected page before the first erase. A read-protected chip
         # or unreadable page therefore never triggers a partial download.
         prepared = []
@@ -101,12 +101,14 @@ class Wb32:
             for offset, value in changes.items():
                 new[offset] = value
             prepared.append((address, old, bytes(new)))
-            progress(12 + int(12 * (index + 1) / len(pages)), "检查 Flash · %d / %d 页" % (index + 1, len(pages)))
+            progress(0, "检查 Flash · %d / %d 页" % (index + 1, len(pages)))
         for index, (address, old, new) in enumerate(prepared):
             if old != new:
                 self.erase_page(address)
                 self.program_page(address, new)
             if self.read(address, PAGE_SIZE) != new:
                 raise UpgradeError("读回校验失败：0x%08X。设备保留在 Boot 模式，请重新升级。" % address)
-            progress(24 + int(69 * (index + 1) / len(prepared)), "写入并校验 · %d / %d 页" % (index + 1, len(prepared)))
+            # Discovery and the non-destructive preflight stay at zero. Advance
+            # only after a page has been written (if needed) and read back.
+            progress(int(93 * (index + 1) / len(prepared)), "写入并校验 · %d / %d 页" % (index + 1, len(prepared)))
         return info

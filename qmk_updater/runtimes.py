@@ -23,7 +23,7 @@ from . import __version__
 from .firmware import FirmwareError
 from .package import create_executable, decode_package
 
-RUNTIME_API = 3
+RUNTIME_API = 4
 TARGETS = {
     "windows-x64": ("Windows 7 / 10 / 11 · x64", ".exe"),
     "macos-arm64": ("macOS · Apple Silicon", ".zip"),
@@ -141,7 +141,7 @@ def validate_runtime(path, expected_target=None):
             manifest = json.loads(archive.read("runtime.json").decode("utf-8"))
             target = manifest["target"]
             if manifest["format"] != 1 or manifest["runtime_api"] != RUNTIME_API or target not in TARGETS:
-                raise FirmwareError("系统模板版本不兼容，请使用 1.3.0 或更新的模板。")
+                raise FirmwareError("系统模板版本不兼容，请使用 1.4.0 或更新的模板。")
             if expected_target and expected_target != target:
                 raise FirmwareError("选中的模板与客户系统不匹配。")
             root = str(_safe_name(manifest["root"]))

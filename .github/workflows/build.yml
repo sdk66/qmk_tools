@@ -52,13 +52,13 @@ jobs:
           ext=""
           if [ "$RUNNER_OS" = Windows ]; then ext=".exe"; fi
           if [ "$RUNNER_OS" = Linux ]; then ext=".tar.gz"; fi
-          python tools/make_package.py --firmware mk20b_via_v9.hex --runtime "release/${{ matrix.platform }}.qmk-runtime.zip" --output "release/${{ matrix.platform }}/SAMURAI-S751-v0.0.9$ext"
-          python tools/make_package.py --firmware mk20b_via_v9.hex --mode continuous --runtime "release/${{ matrix.platform }}.qmk-runtime.zip" --output "release/${{ matrix.platform }}/SAMURAI-S751-v0.0.9-factory$ext"
+          python tools/make_package.py --firmware mk20b_via_v9.hex --runtime "release/${{ matrix.platform }}.qmk-runtime.zip" --output "release/${{ matrix.platform }}/mk20b_via_v9$ext"
+          python tools/make_package.py --firmware mk20b_via_v9.hex --mode continuous --runtime "release/${{ matrix.platform }}.qmk-runtime.zip" --output "release/${{ matrix.platform }}/factory/mk20b_via_v9$ext"
       - name: Make bundled example (macOS)
         if: runner.os == 'macOS'
         run: |
-          python tools/make_package.py --firmware mk20b_via_v9.hex --runtime release/${{ matrix.platform }}.qmk-runtime.zip --output release/${{ matrix.platform }}/SAMURAI-S751-v0.0.9.zip
-          python tools/make_package.py --firmware mk20b_via_v9.hex --mode continuous --runtime release/${{ matrix.platform }}.qmk-runtime.zip --output release/${{ matrix.platform }}/SAMURAI-S751-v0.0.9-factory.zip
+          python tools/make_package.py --firmware mk20b_via_v9.hex --runtime release/${{ matrix.platform }}.qmk-runtime.zip --output release/${{ matrix.platform }}/mk20b_via_v9.zip
+          python tools/make_package.py --firmware mk20b_via_v9.hex --mode continuous --runtime release/${{ matrix.platform }}.qmk-runtime.zip --output release/${{ matrix.platform }}/factory/mk20b_via_v9.zip
       - name: Verify frozen startup and macOS application signatures
         run: python tools/smoke_ci.py --target ${{ matrix.platform }}
       - name: Archive release (preserve executable bits and app symlinks)
