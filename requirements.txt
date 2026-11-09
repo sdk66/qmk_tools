@@ -1,0 +1,6 @@
+# Python 3.11 / modern macOS and Linux. Windows 7 uses requirements-windows.txt.
+PySide6==6.8.3
+hidapi==0.14.0.post4
+pyusb==1.2.1
+libusb-package==1.0.26.2
+PyInstaller==6.12.0

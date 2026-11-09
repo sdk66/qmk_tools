@@ -1,0 +1,12 @@
+QMK Firmware Studio
+
+The Python WB32 USB protocol implementation in qmk_updater/wb32.py is derived
+from the WB32 DFU Updater by Westberry Technology (ChangZhou) Corp., Ltd.
+Copyright (C) 2021 Westberry Technology (ChangZhou) Corp., Ltd.
+Licensed under the Apache License, Version 2.0.
+
+Modifications include Python integration, checked transports and responses,
+sparse-page preservation, preflight validation, GUI progress and package
+integrity checks. Read-protection removal is intentionally not implemented.
+
+User-provided firmware and artwork are not relicensed by this notice.

@@ -1,0 +1,7 @@
+# Python 3.8.10 x64 / Windows 7 SP1, 10, 11
+PySide2==5.15.2.1
+hidapi==0.14.0.post4
+pyusb==1.2.1
+libusb-package==1.0.26.2
+PyInstaller==5.13.2
+pyinstaller-hooks-contrib==2023.10

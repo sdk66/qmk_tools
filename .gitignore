@@ -1,0 +1,9 @@
+.tools/
+.venv/
+build/
+dist/
+release/
+__pycache__/
+*.pyc
+*.spec
+*-preview.png

@@ -1,0 +1,6 @@
+# WB32 Boot and common QMK Raw HID. The maker can export a custom APP rule.
+# Install once: sudo install -m 644 70-qmk-wb32.rules /etc/udev/rules.d/
+# Then: sudo udevadm control --reload-rules
+# Reconnect the keyboard. Run the updater as your regular desktop user.
+SUBSYSTEM=="usb", ATTR{idVendor}=="342d", ATTR{idProduct}=="dfa0", MODE="0660", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="342d", ATTRS{idProduct}=="e594", MODE="0660", TAG+="uaccess"
