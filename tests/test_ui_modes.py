@@ -265,7 +265,10 @@ class UiModeTests(unittest.TestCase):
         source = Path(__file__).resolve().parent.parent / "mk20b_via_v9.hex"
         window.load_firmware(source)
         self.assertEqual(window.output_name.text(), "mk20b_via_v9")
-        self.assertEqual(window.customer_preview.filename.text(), "mk20b_via_v9.exe")
+        from qmk_updater.runtimes import TARGETS
+        for target, (_, extension) in TARGETS.items():
+            window.platform_combo.setCurrentIndex(window.platform_combo.findData(target))
+            self.assertEqual(window.customer_preview.filename.text(), "mk20b_via_v9" + extension)
         window.inputs["product"].setText("Different Product")
         window.inputs["version"].setText("9.9.9")
         window.continuous_mode.setChecked(True)
