@@ -4,7 +4,12 @@
 
 ## 文件名与版本一致性验证
 
-本轮命名及版本统一后的最终测试、冻结程序和四平台模板重建结果待构建完成后补充。下列 157 项测试、体积与耗时数据和 GitHub Actions 链接记录的是此前打包优化构建，不代表本轮重建已完成。
+- 本机 Python 3.8.10 / PySide2：160 项测试通过。制作窗口标题读取实际 `__version__`，Windows 发布文件名与版本资源由同一版本生成；测试包含后续版本变化和无效版本输入。
+- 已重建 `QMK_Firmware_Toolbox_Package_1.6.0.exe`。Windows 原生文件属性实际读取结果：FileVersion = ProductVersion = `1.6.0`，OriginalFilename = `QMK_Firmware_Toolbox_Package_1.6.0.exe`；Windows 固定版本字段按系统格式为 `(1, 6, 0, 0)`。
+- 制作程序、单次和连续客户包的冻结启动检查及安全预览通过，未执行真实 USB 烧录。用户设置目录保持原路径，不会因本次文件名调整丢失目录记忆。
+- [本轮四平台原生构建](https://github.com/sdk66/qmk_tools/actions/runs/42585444321)，源提交 `6efc91c`：四平台均通过 160 项测试、构建、客户包生成和冻结启动检查；Windows 额外检查最终 EXE 的版本属性，两个 Mac 的解压应用通过严格签名校验。
+
+以下 157 项测试、体积与耗时数据和对应 Actions 链接记录此前打包优化构建，保留作为历史比较。
 
 ## 1.6.0 打包优化验证记录
 
